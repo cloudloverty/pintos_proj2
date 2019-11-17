@@ -5,6 +5,7 @@
     "hash.h": "c",
     "stddef.h": "c",
     "pte.h": "c",
-    "palloc.h": "c"
+    "palloc.h": "c",
+    "vaddr.h": "c"
   }
 }

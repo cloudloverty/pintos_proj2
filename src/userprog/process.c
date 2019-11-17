@@ -154,7 +154,7 @@ start_process (void *file_name_)
 
   //////////////////////////////////////////P3
   /* Initializing hash table using vm_init in page.c()*/
-  vm_init(thread_current()->vm);  
+  vm_init(&thread_current()->vm);  
   //////////////////////////////////////////P3
 
   /* Initialize interrupt frame and load executable. */
@@ -756,7 +756,7 @@ bool handle_mm_fault (struct vm_entry* vme) {
   
   switch(vme->file_type) {
     case VM_BIN:
-      load_file (addr, vme);
+      //load_file (addr, vme);
       break;
     case VM_FILE:
 

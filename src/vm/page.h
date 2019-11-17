@@ -1,3 +1,6 @@
+#ifndef VM_PAGE_H
+#define VM_PAGE_H
+
 #include <hash.h>
 #include <debug.h>
 #include <stdint.h>
@@ -28,6 +31,7 @@ struct vm_entry {
   struct hash_elem elem; 
 };
 
+void vm_init (struct hash* vm);
 bool insert_vme (struct hash* vm, struct vm_entry* vme);
 bool delete_vme (struct hash* vm, struct vm_entry* vme);
 struct vm_entry* find_vme(void* va);
@@ -35,3 +39,5 @@ void destroy_vm (struct hash* vm);
 void hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED);
 
 bool load_file(void* kaddr, struct vm_entry* vme);
+
+#endif

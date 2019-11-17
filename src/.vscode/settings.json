@@ -6,6 +6,9 @@
     "stddef.h": "c",
     "pte.h": "c",
     "palloc.h": "c",
-    "vaddr.h": "c"
+    "vaddr.h": "c",
+    "malloc.h": "c",
+    "stdio.h": "c",
+    "pagedir.h": "c"
   }
 }

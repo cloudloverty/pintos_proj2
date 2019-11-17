@@ -156,3 +156,19 @@ hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED)
   free(vme);
 }
 
+/**
+ * @param kaddr   physical address to load the page 
+ * @param vme     vm_entry 
+ * Load the file to physical page in @param kaddr 
+ * Use memset to set remainding bytes to 0, if necessary.  
+ */
+bool 
+load_file(void* kaddr, struct vm_entry* vme) 
+{
+  bool res;
+
+  res = file_read_at(vme->file, kaddr, vme->read_bytes, vme->offset);
+  memset (kaddr + vme->read_bytes, 0, vme->zero_bytes);
+
+  return res; 
+}

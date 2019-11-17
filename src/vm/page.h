@@ -4,11 +4,13 @@
 #include <hash.h>
 #include <debug.h>
 #include <stdint.h>
+#include "filesys/file.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
+#include "userprog/process.h"
 
 #define VM_BIN        0 //Page of ELF format file 
 #define VM_FILE       1 //Page of General File 

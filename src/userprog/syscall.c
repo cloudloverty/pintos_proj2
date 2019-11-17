@@ -1,0 +1,592 @@
+#include "userprog/syscall.h"
+#include <stdio.h>
+#include <syscall-nr.h>
+#include "threads/interrupt.h"
+#include "threads/thread.h"
+#include "threads/vaddr.h"
+#include "devices/shutdown.h"
+#include "filesys/filesys.h"
+#include "vm/page.h"
+
+
+static void syscall_handler (struct intr_frame *);
+static struct vm_entry* check_add_valid(void* addr);
+static void check_buffer_validity(void* buffer, unsigned size, 
+                                  void* esp, bool to_write);
+static void check_valid_string(const void* str, void* esp);
+void set_arg(void* esp, uint32_t* argv, int argc);
+
+/**
+ * Initializies system call system by initializing filesys_lock for 
+ * synchronization between files and the interrupt handler   
+ */ 
+void
+syscall_init (void) 
+{
+	lock_init(&filesys_lock);
+  intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
+}
+
+/** 
+ * @param f intr_frame which stores the esp of the stack 
+ * 
+ * Handles system calls based on system call number using switch statements.
+ * First, get system call number and arguments from f->esp ~ f->esp + 4 * argc
+ * Then, check validity of arguments 
+ * Then, switch to appropriate syscall handler based on syscall number. 
+ * 
+ */ 
+static void
+syscall_handler (struct intr_frame *f UNUSED) 
+{
+	//printf("esp address is %x\n", f->esp);
+	//hex_dump(f->esp, f->esp, 96, true);
+	//printf(*(uint32_t*)0x0804f000);
+
+  check_add_valid((uint32_t)f->esp);
+  uint32_t syscall_num = *(uint32_t*)f->esp;
+  //printf("syscall number: %d\n", syscall_num);
+  //printf ("system call!\n");
+  uint32_t argv[3];
+
+
+  switch (syscall_num) {
+  case SYS_HALT:
+	  halt();
+	  break;
+
+  case SYS_EXIT:
+	  set_arg(f->esp, argv, 1);
+	  exit((int)*(uint32_t*)argv[0]);
+	  break;
+
+  case SYS_EXEC:
+	  set_arg(f->esp, argv, 1);
+	  check_add_valid(argv[0]);
+	  f->eax = exec((const char*) * (uint32_t*)argv[0]);
+	  break;
+
+  case SYS_WAIT:
+	  set_arg(f->esp, argv, 1);
+	  f->eax = wait((pid_t) * (uint32_t*)argv[0]);
+	  break;
+
+  case SYS_CREATE:
+	  set_arg(f->esp, argv, 2);
+	  check_add_valid(argv[0]);
+	  f->eax = create((const char*) * (uint32_t*)argv[0], 
+                    (unsigned) * (uint32_t*)argv[1]);
+	  break;
+
+  case SYS_REMOVE:
+	  set_arg(f->esp, argv, 1);
+	  check_add_valid(argv[0]);
+	  f->eax = remove((const char*) * (uint32_t*)argv[0]);
+	  break;
+
+  case SYS_OPEN:
+	  set_arg(f->esp, argv, 1);
+	  check_add_valid(argv[0]);
+	  f->eax = open((const char*) * (uint32_t*)argv[0]);
+	  break;
+
+  case SYS_FILESIZE:
+	  set_arg(f->esp, argv, 1);
+	  check_add_valid(argv[0]);
+	  f->eax = filesize((int) * (uint32_t*)argv[0]);
+	  break;
+
+  case SYS_READ:
+	  set_arg(f->esp, argv, 3);
+	  check_buffer_validity((void*) argv[1], (unsigned) argv[2], 
+                          f->esp, true);
+	  f->eax = read((int) * (uint32_t*)argv[0], 
+                  (void*) * (uint32_t*)argv[1], 
+                  (unsigned) * (uint32_t*)argv[2]);
+	  break;
+
+  case SYS_WRITE:
+	  set_arg(f->esp, argv, 3);
+	  check_valid_string((void*) argv[1], f->esp);
+	  f->eax = write((int)* (uint32_t*)argv[0], 
+                   (const void*)* (uint32_t*)argv[1], 
+                   (unsigned)* (uint32_t*)argv[2]);
+	  break;
+
+  case SYS_SEEK:
+	  set_arg(f->esp, argv, 2);
+	  seek((int) * (uint32_t*) argv[0], (unsigned) * (uint32_t*) argv[1]);
+	  break;
+
+  case SYS_TELL:
+	  set_arg(f->esp, argv, 1);
+	  f->eax = ((int) * (uint32_t*)argv[0]);
+	  break;
+
+  case SYS_CLOSE:
+	  set_arg(f->esp, argv, 1);
+	  close((int) * (uint32_t*)argv[0]);
+	  break;
+
+  }
+}
+
+/** 
+ * @param esp   stack pointer 
+ * @param argv  argument array
+ * @param argc  argument count
+ * 
+ * Do validity checking of address of all arguments. 
+ * Set up the arguments by retrieving the arguments from the stack denoted by
+ * @param esp and putting into @param argv for @param argc number of times. 
+ */ 
+void 
+set_arg(void* esp, uint32_t* argv, int argc)
+{
+	//printf("esp point to %d\n", (int) * (uint32_t*)(esp));
+	//printf("esp address is %x\n", esp);
+	check_add_valid(esp);
+
+	esp += 4;							// skip syscall number
+	for (int i = 0; i < argc; i++)
+	{
+		//printf("%d roop\n", i);
+		//printf("esp address is %x\n", esp);
+		check_add_valid(esp);
+		argv[i] = (uint32_t*) esp;
+		
+		//printf("esp point to %d\n", (int) * (uint32_t*)(esp));
+		//printf("arg[%d] is %d\n", i, (int) * (uint32_t*)argv[i]);
+
+		esp += 4;
+	}
+}
+/**
+ * @param addr address of pointer to check validity
+ * @returns    vm_entry, if applicable 
+ * 
+ * Checks the validity of @param addr. 
+ */ 
+static struct vm_entry* 
+check_add_valid(void* addr)
+{
+  struct vm_entry* vme; 
+
+	if ((uint32_t)addr <= 0x8048000 || (uint32_t)addr >= 0xc0000000)
+		exit(-1);
+  
+  vme = find_vme(addr);
+
+  if (vme == NULL) {
+    exit(-1);
+  } else {
+    return vme;
+  }
+}
+
+/**
+ * @param buffer 
+ * @param size
+ * @param esp 
+ * @param to_write  check whether buffer is wriable 
+ * 
+ *  Function to check whether vm_entry in buffer is valid 
+ */ 
+static void 
+check_buffer_validity(void* buffer, unsigned size, 
+                      void* esp, bool to_write) 
+{ 
+  struct vm_entry* vme;
+
+  while (size > 0) {
+    vme = check_add_valid(buffer);
+
+    //check whether vm_entry exisits, and if it exists, check read-write 
+    //permission
+    if (vme == NULL) 
+      exit(-1);
+    
+    if (to_write && vme->write_permission == false) 
+      exit (-1);
+
+    buffer += PGSIZE;
+    size -= PGSIZE;
+  }
+}
+
+/** 
+ * @param str   str to check validity 
+ * @param esp   
+ * 
+ * Function that verifies whether the address value of the string is valid
+ */ 
+static void 
+check_valid_string(const void* str, void* esp) 
+{
+  struct vm_entry* vme;
+
+  vme = check_add_valid(str);
+}
+
+/**
+ * Terminates Pintos by calling shutdown_power_off().
+ * This should be seldomly used as information such as deadlock
+ * sitatuions can be lost.
+ */ 
+void		//0
+halt(void)
+{
+	shutdown_power_off();
+}
+
+/** 
+ * @param status status of the program 
+ * 
+ * Terminates the current user program, returning @param status to the 
+ * kernel. If the process's parent <wait>s for it, this is the status 
+ * that will be returned. 
+ * 
+ * Conventionally, a status of 0 indicates success, and nonzero values 
+ * indicate errors 
+ */
+void		//1
+exit(int status)
+{
+	//printf("\n\ntry to exit with %d\n", status);
+	struct thread* t = thread_current();
+	//printf("thread name is %s\n", t->name);
+	t->exit_status = status;
+
+	for (int i = 3; i < 128; i++) {
+		if (t->fd_table[i] != NULL) {
+			close(i);
+		}
+	}
+	file_close(t->running_file);
+	t->running_file = NULL;
+
+	printf("%s: exit(%d)\n", t->name, status);
+	thread_exit();
+}
+
+/**
+ * @param cmd_line Command line arguments 
+ * @return New procees's pid | -1 if error 
+ * 
+ * Runs the executable whose name is given in cmd_line, passing any given 
+ * arguments. @return new process's pid or -1 if error. 
+ * 
+ * Parent process cannot return from the exec until it knows whether the child
+ * process successfully loaded its exectuable;
+*/
+pid_t		//2
+exec(const char* cmd_line)
+{
+	check_add_valid(cmd_line);
+
+	if (*cmd_line == NULL) exit(-1);
+	//return process_execute(cmd_line);
+	//printf("exec. process_execute\n");
+	tid_t cpid = process_execute(cmd_line);
+
+	if (cpid == -1 || cpid == TID_ERROR) return -1;
+
+	struct thread* c = get_child_process(cpid);
+	//printf("exec. sema_down for sema_load\n");
+	sema_down(&c->sema_load);
+
+
+	if (!c->load_success)
+	{
+		remove_child_process(c);
+		return -1;
+	}
+	else
+		return cpid;
+
+}
+
+/** 
+ * @param pid child process pid
+ * @return exit status of the child 
+ * Wait until child process @param pid exits. Returns the exit status of the 
+ * child. However, the wait() function can immediately @return -1 if calling
+ * double wait on an already waiting child; child has been exited by kernel; 
+ * or if pid is not a direct child of calling process.
+ */ 
+int			//3
+wait(pid_t pid)
+{
+	//printf("\nwait for: pid %d\n", (int)pid);
+	struct thread* c = get_child_process(pid);
+
+	if (c == NULL) return -1;
+	//printf("child pid is %d\n", c->tid);
+	//printf("getChild at syscall done\n");
+
+
+	int exit_status = process_wait(c->tid);
+
+	//remove_child_process(c);
+	//printf("return exit_status: %d\n", exit_status);
+	return exit_status;
+}
+
+/**
+ * @param file          Filename
+ * @param initial_size  initial size of file 
+ * @return true if successful, false if unsuccessful. 
+ * Create a new file called @param file initially @param initial_size
+ */
+bool		//4
+create(const char* file, unsigned initial_size)
+{
+	check_add_valid(file);
+
+	if (*file == NULL) exit(-1);
+	return filesys_create(file, initial_size);
+}
+
+
+/**
+ * @param file Filename
+ * @return true if successful, false otherwise 
+ * Remove a file named @param file. If removing an open file, follow the UNIX
+ * semantics of removing an open file. 
+ */ 
+bool		//5
+remove(const char* file)
+{
+	check_add_valid(file);
+
+	if (*file == NULL) exit(-1);
+	return filesys_remove(file);
+}
+
+/** 
+ * @param file filename
+ * @returns fd as unsigned int if open is successful, or -1 if error 
+ * 
+ * Opens the file called @param file. Returns a nonegative integer handle 
+ * called a "file descriptior" (fd), or -1 if file cannot be opened 
+ */
+int			//6
+open(const char* file)
+{
+	check_add_valid(file);
+	if (file == NULL) return -1;
+
+	lock_acquire(&filesys_lock);
+
+	struct file* open_file = filesys_open(file);
+	if (open_file == NULL) {
+		lock_release(&filesys_lock);
+		return -1;
+	}
+	else
+	{
+		int fd = new_file(open_file);
+		lock_release(&filesys_lock);
+		return fd;
+	}
+}
+
+/**
+ * @param fd file descriptior
+ * @returns the size of file, in int
+ * 
+ * Returns the filesize whose file descriptor is denoted by @param fd
+ */
+int			//7
+filesize(int fd)
+{
+	struct file* f = get_file(fd);
+	if (f == NULL) return -1;
+
+	return file_length(f);
+}
+
+/** 
+ * @param fd     file descriptor 
+ * @param buffer buffer to read into 
+ * @param size   size of bytes to read 
+ * 
+ * Reads @param size bytes from the file opened as @param fd into 
+ * @param buffer. Returns the number of bytes actually read, or -1 if the
+ * file could not be read. Fd 0 reads from tbe keyobard using input_getc()
+ */
+int			//8
+read(int fd, void* buffer, unsigned size)
+{
+	check_add_valid(buffer);
+	lock_acquire(&filesys_lock);
+
+	if (fd == 0)
+	{
+		input_getc();
+		lock_release(&filesys_lock);
+		return size;
+	}
+	else if (fd > 2) {
+		struct file* f = get_file(fd);
+		if (f == NULL) { 
+			lock_release(&filesys_lock);
+			return -1; 
+		}
+
+		
+		int ans = file_read(f, buffer, size);
+		lock_release(&filesys_lock);
+
+		return ans;
+	}
+	lock_release(&filesys_lock);
+	return -1;
+}
+
+/**
+ * @param fd      Fild Descriptor
+ * @param buffer  File location
+ * @param size    Size to write to file
+ * @return Bytes actually written in unsigned. 
+ * 
+ * Writes @param size bytes from @param buffer to the open file @param fd 
+ * @return bytes actually written in unsigned int. The bytes actually written 
+ * may be smaller than @param size. If @param fd is 1, writes to console 
+ * (stdout).  
+ * 
+ * Writing past EOF is not an error; rather, it should extend the file. 
+ * This functionality will be implemented in PROJECT 4  
+ */
+int			//9
+write(int fd, const void* buffer, unsigned size)
+{
+	check_add_valid(buffer);
+	lock_acquire(&filesys_lock);
+
+	if (fd == 1)
+	{
+		putbuf(buffer, size);
+		lock_release(&filesys_lock);
+		return size;
+	}
+	else if (fd > 2){
+		struct file* f = get_file(fd);
+		if (f == NULL) { 
+			lock_release(&filesys_lock);
+			return -1; 
+		}
+
+		
+		int ans = file_write(f, buffer, size);
+		
+		lock_release(&filesys_lock);
+		return ans;
+	}
+	lock_release(&filesys_lock);
+	return -1;
+}
+
+/**
+ * @param fd file descriptor 
+ * @param position position to change 
+ * 
+ * Chages the next byte to be read or written in open file @param fd to 
+ * @param position, expressed in bytes from the beginning of the file. 
+ * Thus, a @param position of 0 is the file's start 
+ * 
+ * A seek past the current EOF is not an error; a later read should obtain 
+ * 0 bytes. A later write should extend the file, filling any unwritten gaps 
+ * with zeros. 
+ */ 
+void		//10
+seek(int fd, unsigned position)
+{
+	struct file* f = get_file(fd);
+	if (f == NULL) exit(-1);
+	file_seek(f, position);
+}
+
+/**
+ * @param fd file descriptor
+ * 
+ * Returns the positif the next byte to be read or written in open file
+ * @param fd, expressed in bytes from the beginning of the file. 
+ */ 
+unsigned	//11
+tell(int fd)
+{
+	struct file* f = get_file(fd);
+	if (f == NULL) return -1;
+	return file_tell(f);
+}
+
+/**
+ * @param fd file descriptor
+ * 
+ * Closes the file descriptor @param fd. Exiting / terminating a process 
+ * implicitly closes all its open file descriptors, as if calling this 
+ * funciton for each one. 
+ */ 
+void		//12
+close(int fd)
+{
+	struct file* f = get_file(fd);
+	if (f == NULL) exit(-1);
+	close_file(fd);
+}
+
+/** 
+ * @param file pointer to struct file
+ * @return file descritptor for file 
+ * 
+ * Creates a new file descriptor in the current thread of @param file by 
+ * allocating space in the file descriptor table. 
+ * Returns the file descriptor in the file descriptor table of the current
+ * thread. 
+ */ 
+int 
+new_file(struct file* file)
+{
+	if (file == NULL) return -1;
+
+	struct thread* t = thread_current();
+	int new_fd_num = t->fd_max;
+	t->fd_table[new_fd_num] = file;
+	t->fd_max = new_fd_num + 1;
+	return new_fd_num;
+}
+
+/**
+ * @param fd file descriptor 
+ * @return file pointer 
+ * 
+ * Gets the file denoted by @param fd in the file descriptor table of the 
+ * current thread.  
+ */ 
+struct file*
+get_file(int fd)
+{
+	struct thread* t = thread_current();
+	if (t->fd_table[fd] == NULL)
+		return NULL;
+	else
+		return t->fd_table[fd];
+}
+
+/**
+ * @param fd file descriptor 
+ * 
+ * Closes @param fd of the current thread. Remove file descritptor from 
+ * file descriptor table. 
+ */ 
+void 
+close_file(int fd)
+{
+	struct file* f = get_file(fd);
+	if (f == NULL) return;
+
+	file_close(f);
+	thread_current()->fd_table[fd] = NULL;
+}
+

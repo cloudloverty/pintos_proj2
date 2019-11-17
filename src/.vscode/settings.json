@@ -1,0 +1,10 @@
+{
+  "files.associations": {
+    "intr-stubs.h": "c",
+    "page.h": "c",
+    "hash.h": "c",
+    "stddef.h": "c",
+    "pte.h": "c",
+    "palloc.h": "c"
+  }
+}

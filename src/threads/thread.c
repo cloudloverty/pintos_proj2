@@ -487,6 +487,8 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_exit, 0);
   sema_init(&t->sema_sync, 0);
 
+  vm_init(&t->vm);
+
   for (int i = 0; i < 128; i++)
 	  t->fd_table[i] = NULL;
   t->fd_max = 3;

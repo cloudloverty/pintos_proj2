@@ -20,7 +20,6 @@
 #include "threads/synch.h"
 #include "syscall.h"
 #include "threads/malloc.h"
-#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -662,35 +661,37 @@ static bool
 setup_stack (void **esp) 
 {
   uint8_t *kpage;
+  uint8_t *upage;
   bool success = false;
+  struct vm_entry* vme;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
-      success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;		//change PHYS_BASE to PHYS_BASE - 12
-      else
-        palloc_free_page (kpage);
-
+      upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+      success = install_page (upage, kpage, true);
+      if (success) {
       ////////// Added in P3 start /////////
 
       //initialize vm_entry for 4KB stack 
-      struct vm_entry* vme = malloc(sizeof (struct vm_entry));
+      vme = malloc(sizeof (struct vm_entry));
 
       //set members of the vm_entry 
       //TODO: va, write_permission, is_loaded_to_memory unclear
-      vme->file_type = VM_BIN;
-      vme->va = kpage;                
+      vme->file_type = VM_SWAP;
+      vme->va = upage;                
       vme->write_permission = true;    
-      vme->is_loaded_to_memory = false;
-      vme->offset = 0;
-      vme->read_bytes = 0;    
-      vme->zero_bytes = PGSIZE - vme->read_bytes;
+      vme->is_loaded_to_memory = true;
 
       //insert created vm_entry into vm hash table of thread 
       insert_vme(&thread_current()->vm, vme);
       ////////// Added in P3 end /////////
+
+      *esp = PHYS_BASE;
+
+      } else
+        palloc_free_page (kpage);
+
       }
 
   return success;
@@ -748,15 +749,34 @@ remove_child_process(struct thread* c)
 	palloc_free_page(c);
 }
 
+/**
+ * @param vme   vme that page fault occurred 
+ * @returns     whether page fault was successfuly handled 
+ * 
+ * Handles page fault originated from @file excetion.c and returns the result 
+ * of page fault handling in boolean form. 
+ * 
+ * Firstly, allocates new page; then based on the file type of the vme, 
+ * do appropriate operations. 
+ */ 
+bool 
+page_fault_handler (struct vm_entry* vme) 
+{
+  uint8_t* kaddr; //address of physical page 
+  bool res;  
 
-bool handle_mm_fault (struct vm_entry* vme) {
-  void* addr;
-
-  addr = palloc_get_page(PAL_ZERO);
+  kaddr = palloc_get_page(PAL_ZERO);
+  if (kaddr == false) {
+    return false;
+  }
   
   switch(vme->file_type) {
-    case VM_BIN:
-      //load_file (addr, vme);
+    case VM_BIN:  
+      load_file(kaddr, vme);
+      res = install_page(vme->va, kaddr, vme->write_permission);
+      if (!res) {
+        palloc_free_page(kaddr);
+      }
       break;
     case VM_FILE:
 
@@ -768,4 +788,5 @@ bool handle_mm_fault (struct vm_entry* vme) {
       ASSERT(false); // should never reach 
       break;
   }
+  return res;
 }

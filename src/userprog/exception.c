@@ -148,15 +148,21 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  /* To implement virtual memory, delete the rest of the function
-     body, and replace it with code that brings in the page to
-     which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
-  
-  
+  //ready only?
+  struct vm_entry* vme = find_vme(fault_addr);
+
+
+  ////exit(-1);
+
+  ///* To implement virtual memory, delete the rest of the function
+  //   body, and replace it with code that brings in the page to
+  //   which fault_addr refers. */
+  //printf ("Page fault at %p: %s error %s page in %s context.\n",
+  //        fault_addr,
+  //        not_present ? "not present" : "rights violation",
+  //        write ? "writing" : "reading",
+  //        user ? "user" : "kernel");
+  //
+  ////kill(f)
 }
 

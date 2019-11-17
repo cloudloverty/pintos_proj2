@@ -689,10 +689,9 @@ setup_stack (void **esp)
 
       *esp = PHYS_BASE;
 
-      } else
-        palloc_free_page (kpage);
-
-      }
+    } else
+      palloc_free_page (kpage);
+    }
 
   return success;
 }

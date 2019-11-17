@@ -59,6 +59,9 @@ bool vm_hash_less_func (const struct hash_elem* a,
   vme1 = (struct vm_entry*) hash_entry(a, struct vm_entry, elem);
   vme2 = (struct vm_entry*) hash_entry(b, struct vm_entry, elem);
 
+  printf(vme1->va);
+  printf(vme2->va);
+
   return (vme1->va < vme2->va);
 }
 
@@ -165,10 +168,13 @@ hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED)
 bool 
 load_file(void* kaddr, struct vm_entry* vme) 
 {
-  bool res;
+  off_t actual_read; 
 
-  res = file_read_at(vme->file, kaddr, vme->read_bytes, vme->offset);
+  actual_read = file_read_at(vme->file, kaddr, vme->read_bytes, vme->offset);
   memset (kaddr + vme->read_bytes, 0, vme->zero_bytes);
 
-  return res; 
+  if (actual_read != vme->read_bytes) {
+    return false;
+  }
+  return true; 
 }

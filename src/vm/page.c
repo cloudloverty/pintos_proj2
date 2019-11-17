@@ -55,14 +55,13 @@ bool vm_hash_less_func (const struct hash_elem* a,
 {
   struct vm_entry* vme1; //struct that hash_elem a is in 
   struct vm_entry* vme2; //struct that hash_elem b is in 
+  bool res;
 
   vme1 = (struct vm_entry*) hash_entry(a, struct vm_entry, elem);
   vme2 = (struct vm_entry*) hash_entry(b, struct vm_entry, elem);
 
-  printf(vme1->va);
-  printf(vme2->va);
-
-  return (vme1->va < vme2->va);
+  res = vme1->va < vme2->va;
+  return res;
 }
 
 /**

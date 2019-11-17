@@ -13,6 +13,6 @@ void process_activate (void);
 struct thread* get_child_process(int);
 void remove_child_process(struct thread*);
 
-bool page_fault_handler(struct vm_entry* vme);
+bool page_fault_handler(struct vm_entry*);
 
 #endif /* userprog/process.h */

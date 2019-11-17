@@ -151,11 +151,6 @@ start_process (void *file_name_)
   cmd_name = argv[0];
 
 
-  //////////////////////////////////////////P3
-  /* Initializing hash table using vm_init in page.c()*/
-  vm_init(&thread_current()->vm);  
-  //////////////////////////////////////////P3
-
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
@@ -771,7 +766,8 @@ page_fault_handler (struct vm_entry* vme)
   
   switch(vme->file_type) {
     case VM_BIN:  
-      load_file(kaddr, vme);
+      if (!load_file(kaddr, vme))
+        return false;
       res = install_page(vme->va, kaddr, vme->write_permission);
       if (!res) {
         palloc_free_page(kaddr);

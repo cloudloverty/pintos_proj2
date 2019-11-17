@@ -4,6 +4,7 @@
 #include "userprog/gdt.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "userprog/syscall.h"
 #include "vm/page.h"
 
 /* Number of page faults processed. */
@@ -151,11 +152,18 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  if (!not_present)
+  if (not_present)
     exit(-1);
+
+  if ((uint32_t)fault_addr <= 0x8048000 || (uint32_t)fault_addr >= 0xc0000000)
+		exit(-1);
 
   //find struct vm_entry for page fault address
   vme = find_vme(fault_addr);
+
+  if (vme == NULL) 
+    exit(-1); 
+
   //call page fault handler 
   res_page_fault = page_fault_handler(vme);
 

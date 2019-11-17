@@ -10,7 +10,6 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "userprog/pagedir.h"
-#include "userprog/process.h"
 #include <string.h>
 
 #define VM_BIN        0 //Page of ELF format file 

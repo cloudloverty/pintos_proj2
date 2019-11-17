@@ -1,4 +1,5 @@
 #include "vm/page.h"
+#include "userprog/process.h"
 
 static unsigned vm_hash_func(const struct hash_elem* e, void* aux);
 static bool vm_hash_less_func (const struct hash_elem* a, 

@@ -158,7 +158,7 @@ page_fault (struct intr_frame *f)
   //find struct vm_entry for page fault address
   vme = find_vme(fault_addr);
   //call page fault handler 
-  page_fault_handler(vme);
+  res_page_fault = page_fault_handler(vme);
 
   if (!res_page_fault)
     exit(-1); 

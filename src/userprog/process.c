@@ -87,7 +87,6 @@ process_execute (const char *file_name)
   }
 
 
-
   return tid;
 }
 
@@ -107,7 +106,7 @@ process_execute (const char *file_name)
 static void
 start_process (void *file_name_)
 {
-	//printf("start_process.........................\n");
+  //printf("start_process.........................\n");
 
   char *file_name = file_name_;
 
@@ -178,7 +177,6 @@ start_process (void *file_name_)
 	  thread_current()->load_success = true;
 	  sema_up(&thread_current()->sema_load);
   }
-
 
   ///////////// Set up Stack /////////////
   esp = &if_.esp;
@@ -643,6 +641,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       //Add vm_entry to hash table
       insert_vme(&thread_current()->vm, vme);
+	  printf("load segment vme inserted: %x\n", upage);
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -663,7 +662,7 @@ setup_stack (void **esp)
   bool success = false;
   struct vm_entry* vme;
 
-  vme = malloc(sizeof(struct vm_entry));
+  vme = (struct vm_entry*) malloc(sizeof(struct vm_entry));
   if (vme == NULL)
   {
 	  return false;
@@ -672,6 +671,8 @@ setup_stack (void **esp)
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
+	  printf("phys base: %x\n", PHYS_BASE);
+	  printf("pgsize: %u\n", PGSIZE);
       upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
       success = install_page (upage, kpage, true);
       if (success) 
@@ -691,6 +692,7 @@ setup_stack (void **esp)
 
 		  //insert created vm_entry into vm hash table of thread 
 		  insert_vme(&thread_current()->vm, vme);
+		  printf("setup_stack vme insterted: %x\n", upage);
 		  ////////// Added in P3 end /////////
 
 	  } 
@@ -772,9 +774,9 @@ page_fault_handler (struct vm_entry* vme)
 {
   uint8_t* kaddr; //address of physical page 
   bool res;  
-
+  printf("page_fault_handler!!\n");
   kaddr = palloc_get_page(PAL_ZERO);
-  if (kaddr == false) {
+  if (kaddr == NULL) {
     return false;
   }
   
@@ -784,8 +786,10 @@ page_fault_handler (struct vm_entry* vme)
         palloc_free_page(kaddr);
         return false;
       }
+	  printf("page_fault_handler: %u\n", vme->va);
       res = install_page(vme->va, kaddr, vme->write_permission);
       if (!res) {
+		  return false;
       }
       break;
     case VM_FILE:

@@ -153,24 +153,39 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  printf("page fault: %x \n", fault_addr);
 
-  if (not_present)
-    exit(-1);
+  if (!user) {
+	  printf("not user: %x\n", fault_addr);
+	  exit(-1);
+  }
 
-  if ((uint32_t)fault_addr <= 0x8048000 || (uint32_t)fault_addr >= 0xc0000000)
-		exit(-1);
+  if (not_present) 
+  {
+	  printf("not_present\n");
+	  //if ((void*)fault_addr < 0x8048000 || (void*)fault_addr >= 0xc0000000)
+	  //{
+		 // printf("page fault 1: %u\n", fault_addr);
+		 // exit(-1);
+	  //}
 
-  //find struct vm_entry for page fault address
-  vme = find_vme(fault_addr);
+	  //find struct vm_entry for page fault address
+	  vme = find_vme(fault_addr);
+	  if (vme == NULL)
+	  {
+		  printf("page fault 2\n");
+		  exit(-1);
+	  }
+	  //call page fault handler 
+	  res_page_fault = page_fault_handler(vme);
 
-  if (vme == NULL) 
-    exit(-1); 
+	  if (!res_page_fault)
+	  {
+		  printf("page fault 4\n");
+		  exit(-1);
+	  }
+  }
 
-  //call page fault handler 
-  res_page_fault = page_fault_handler(vme);
-
-  if (!res_page_fault)
-    exit(-1); 
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

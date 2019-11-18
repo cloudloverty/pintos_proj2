@@ -113,14 +113,15 @@ find_vme(void* va)
 {
   void* start_virtual_page;
   struct hash_elem* e; 
-  struct vm_entry vme; //struct that hash_elem e is in 
+  struct vm_entry* vme; //struct that hash_elem e is in 
 
   start_virtual_page = pg_round_down(va);
-  vme.va = va; 
+  vme->va = va; 
 
-  hash_find(&thread_current()->vm, &(vme.elem)); 
+  e = hash_find(&thread_current()->vm, &(vme->elem)); 
 
   if (e == NULL) {
+	  printf("cannot find vme: %d\n", (int)va);
     return NULL; 
   } else {
     return  hash_entry(e, struct vm_entry, elem);
@@ -147,9 +148,9 @@ destroy_vm(struct hash* vm)
 void 
 hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED) 
 {
-  //struct vm_entry* vme; //struct that hash_elem e is in 
-  //void* start_of_page; 
-  //
+  struct vm_entry* vme; //struct that hash_elem e is in 
+  void* start_of_page; 
+  
   //vme = (struct vm_entry*) hash_entry(e, struct vm_entry, elem);
   ///*if page is loaded to memory, free page and change page in PDE */
   //if (vme->is_loaded_to_memory == true) { 

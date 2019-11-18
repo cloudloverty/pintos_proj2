@@ -39,6 +39,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
+	printf("syscall_handler\n");
 	//printf("esp address is %x\n", f->esp);
 	//hex_dump(f->esp, f->esp, 96, true);
 	//printf(*(uint32_t*)0x0804f000);
@@ -225,7 +226,11 @@ check_valid_string(const void* str, void* esp)
 {
   struct vm_entry* vme;
 
-  vme = check_add_valid(str);
+  while (*(char*)str !=  NULL)
+  {
+	  vme = check_add_valid(str);
+	  str = (char*)str + 1;
+  }
 }
 
 /**

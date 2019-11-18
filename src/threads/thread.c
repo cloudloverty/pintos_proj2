@@ -6,6 +6,7 @@
 #include <string.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
+#include "vm/page.h"
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
 #include "threads/switch.h"
@@ -478,6 +479,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->magic = THREAD_MAGIC;
+  //////////////////////////////////////////P3
+  /* Initializing hash table using vm_init in page.c()*/
+  //printf("get hash table! \n");
+  //vm_init(hash_table);  
+  //////////////////////////////////////////P3
 
   old_level = intr_disable ();
   list_push_back (&all_list, &t->allelem);

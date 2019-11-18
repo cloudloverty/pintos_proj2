@@ -43,6 +43,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *file_name) 
 {
+	//printf("process_execute\n");
   char *fn_copy;
 
   ////////// Added /////////
@@ -149,12 +150,7 @@ start_process (void *file_name_)
   //printf("\nfile name_start_process: %s\n", argv[0]);
 
   cmd_name = argv[0];
-
-
-  //////////////////////////////////////////P3
-  /* Initializing hash table using vm_init in page.c()*/
-  vm_init(&thread_current()->vm);  
-  //////////////////////////////////////////P3
+  vm_init(&thread_current()->vm);
 
   /* Initialize interrupt frame and load executable. */
   memset (&if_, 0, sizeof if_);
@@ -632,6 +628,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       //Create vm_entry using malloc()
       struct vm_entry* vme = (struct vm_entry*) malloc(sizeof(struct vm_entry));
+	  if (vme == NULL)
+		  return false;
 
       //Set vm_entry members 
       vme->file_type = VM_FILE;
@@ -665,32 +663,42 @@ setup_stack (void **esp)
   bool success = false;
   struct vm_entry* vme;
 
+  vme = malloc(sizeof(struct vm_entry));
+  if (vme == NULL)
+  {
+	  return false;
+  }
+
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
       success = install_page (upage, kpage, true);
-      if (success) {
-      ////////// Added in P3 start /////////
+      if (success) 
+	  {
+		  *esp = PHYS_BASE;
 
-      //initialize vm_entry for 4KB stack 
-      vme = malloc(sizeof (struct vm_entry));
+		  ////////// Added in P3 start /////////
+		  //initialize vm_entry for 4KB stack 
+		  //vme = malloc(sizeof(struct vm_entry));
 
-      //set members of the vm_entry 
-      //TODO: va, write_permission, is_loaded_to_memory unclear
-      vme->file_type = VM_SWAP;
-      vme->va = upage;                
-      vme->write_permission = true;    
-      vme->is_loaded_to_memory = true;
+		  //set members of the vm_entry 
+		  //TODO: va, write_permission, is_loaded_to_memory unclear
+		  vme->file_type = VM_SWAP;
+		  vme->va = upage;                
+		  vme->write_permission = true;    
+		  vme->is_loaded_to_memory = true;
 
-      //insert created vm_entry into vm hash table of thread 
-      insert_vme(&thread_current()->vm, vme);
-      ////////// Added in P3 end /////////
+		  //insert created vm_entry into vm hash table of thread 
+		  insert_vme(&thread_current()->vm, vme);
+		  ////////// Added in P3 end /////////
 
-      *esp = PHYS_BASE;
-
-    } else
-      palloc_free_page (kpage);
+	  } 
+	  else 
+	  {
+		  palloc_free_page(kpage);
+		  return false;
+	  }
     }
 
   return success;
@@ -771,7 +779,8 @@ page_fault_handler (struct vm_entry* vme)
   
   switch(vme->file_type) {
     case VM_BIN:  
-      load_file(kaddr, vme);
+      if (!load_file(kaddr, vme))
+        return false;
       res = install_page(vme->va, kaddr, vme->write_permission);
       if (!res) {
         palloc_free_page(kaddr);

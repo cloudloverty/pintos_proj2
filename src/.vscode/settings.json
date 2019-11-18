@@ -9,6 +9,7 @@
     "vaddr.h": "c",
     "malloc.h": "c",
     "stdio.h": "c",
-    "pagedir.h": "c"
+    "pagedir.h": "c",
+    "string.h": "c"
   }
 }

@@ -13,8 +13,9 @@ static bool vm_hash_less_func (const struct hash_elem* a,
 void 
 vm_init (struct hash* vm) 
 {
-  bool hash_table_init_res; //return value of hash_init function 
+  //bool hash_init(struct hash* h, hash_hash_func * hash, hash_less_func * less, void* aux)
 
+  bool hash_table_init_res; //return value of hash_init function 
   hash_table_init_res = hash_init(vm, vm_hash_func, vm_hash_less_func, NULL); 
 
   ASSERT(hash_table_init_res != false); 
@@ -55,14 +56,13 @@ bool vm_hash_less_func (const struct hash_elem* a,
 {
   struct vm_entry* vme1; //struct that hash_elem a is in 
   struct vm_entry* vme2; //struct that hash_elem b is in 
+  bool res;
 
   vme1 = (struct vm_entry*) hash_entry(a, struct vm_entry, elem);
   vme2 = (struct vm_entry*) hash_entry(b, struct vm_entry, elem);
 
-  printf(vme1->va);
-  printf(vme2->va);
-
-  return (vme1->va < vme2->va);
+  res = vme1->va < vme2->va;
+  return res;
 }
 
 /**
@@ -146,17 +146,17 @@ destroy_vm(struct hash* vm)
 void 
 hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED) 
 {
-  struct vm_entry* vme; //struct that hash_elem e is in 
-  void* start_of_page; 
-  
-  vme = (struct vm_entry*) hash_entry(e, struct vm_entry, elem);
-  /*if page is loaded to memory, free page and change page in PDE */
-  if (vme->is_loaded_to_memory == true) { 
-    start_of_page = pg_round_down(vme->va);
-    palloc_free_page(start_of_page);
-    pagedir_clear_page(thread_current()->pagedir, start_of_page);
-  }
-  free(vme);
+  //struct vm_entry* vme; //struct that hash_elem e is in 
+  //void* start_of_page; 
+  //
+  //vme = (struct vm_entry*) hash_entry(e, struct vm_entry, elem);
+  ///*if page is loaded to memory, free page and change page in PDE */
+  //if (vme->is_loaded_to_memory == true) { 
+  //  start_of_page = pg_round_down(vme->va);
+  //  palloc_free_page(start_of_page);
+  //  pagedir_clear_page(thread_current()->pagedir, start_of_page);
+  //}
+  //free(vme);
 }
 
 /**

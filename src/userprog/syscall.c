@@ -39,7 +39,7 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f UNUSED) 
 {
-	printf("syscall_handler\n");
+	//printf("syscall_handler\n");
 	//printf("esp address is %x\n", f->esp);
 	//hex_dump(f->esp, f->esp, 96, true);
 	//printf(*(uint32_t*)0x0804f000);
@@ -63,7 +63,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   case SYS_EXEC:
 	  set_arg(f->esp, argv, 1);
-	  check_add_valid(argv[0]);
+	  check_valid_string((const char*) * (uint32_t*)argv[0], f->esp);
 	  f->eax = exec((const char*) * (uint32_t*)argv[0]);
 	  break;
 
@@ -74,32 +74,31 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   case SYS_CREATE:
 	  set_arg(f->esp, argv, 2);
-	  check_add_valid(argv[0]);
+	  check_valid_string((const char*) * (uint32_t*)argv[0], f->esp);
 	  f->eax = create((const char*) * (uint32_t*)argv[0], 
                     (unsigned) * (uint32_t*)argv[1]);
 	  break;
 
   case SYS_REMOVE:
 	  set_arg(f->esp, argv, 1);
-	  check_add_valid(argv[0]);
+	  check_valid_string((const char*) * (uint32_t*)argv[0], f->esp);
 	  f->eax = remove((const char*) * (uint32_t*)argv[0]);
 	  break;
 
   case SYS_OPEN:
 	  set_arg(f->esp, argv, 1);
-	  check_add_valid(argv[0]);
+	  check_valid_string((const char*) * (uint32_t*)argv[0], f->esp);
 	  f->eax = open((const char*) * (uint32_t*)argv[0]);
 	  break;
 
   case SYS_FILESIZE:
 	  set_arg(f->esp, argv, 1);
-	  check_add_valid(argv[0]);
 	  f->eax = filesize((int) * (uint32_t*)argv[0]);
 	  break;
 
   case SYS_READ:
 	  set_arg(f->esp, argv, 3);
-	  check_buffer_validity((void*) argv[1], (unsigned) argv[2], 
+	  check_buffer_validity((void*) * (uint32_t*)argv[1], (unsigned) * (uint32_t*)argv[2],
                           f->esp, true);
 	  f->eax = read((int) * (uint32_t*)argv[0], 
                   (void*) * (uint32_t*)argv[1], 
@@ -108,7 +107,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   case SYS_WRITE:
 	  set_arg(f->esp, argv, 3);
-	  check_valid_string((void*) argv[1], f->esp);
+	  check_valid_string((const char*) * (uint32_t*)argv[1], f->esp);
 	  f->eax = write((int)* (uint32_t*)argv[0], 
                    (const void*)* (uint32_t*)argv[1], 
                    (unsigned)* (uint32_t*)argv[2]);
@@ -173,16 +172,16 @@ check_add_valid(void* addr)
 {
   struct vm_entry* vme; 
 
-	if ((uint32_t)addr <= 0x8048000 || (uint32_t)addr >= 0xc0000000)
+	if ((uint32_t)addr < 0x8048000 || (uint32_t)addr >= 0xc0000000)
 	{
-		printf("check_add_valid 1\n");
+		//printf("check_add_valid 1: %x\n", addr);
 		exit(-1);
 	}
   
   vme = find_vme(addr);
 
   if (vme == NULL) {
-	  printf("check_add_valid 2\n");
+	  ///printf("check_add_valid 2\n");
     exit(-1);
   } else {
     return vme;
@@ -202,26 +201,30 @@ check_buffer_validity(void* buffer, unsigned size,
                       void* esp, bool to_write) 
 { 
   struct vm_entry* vme;
+  //printf("param status, %p, %d", buffer, size);
 
   while (size > 0) {
     vme = check_add_valid(buffer);
+	//printf("check_buffer_validity %p, %u\n", buffer, size);
+
 
     //check whether vm_entry exisits, and if it exists, check read-write 
     //permission
 	if (vme == NULL) 
 	{
-		printf("check_buffer_validity 1\n");
+		//printf("check_buffer_validity 1\n");
 		exit(-1);
 	}
     
 	if (to_write && vme->write_permission == false) 
 	{
-		printf("check_buffer_validity 2\n");
+		//printf("check_buffer_validity 2\n");
 		exit(-1);
 	}
+    buffer++;
+    size--;
+	//printf("check_buffer_validity success\n", buffer);
 
-    buffer += PGSIZE;
-    size -= PGSIZE;
   }
 }
 
@@ -236,11 +239,12 @@ check_valid_string(const void* str, void* esp)
 {
   struct vm_entry* vme;
 
-  while (*(char*)str !=  NULL)
+  while (*((char*)str) != NULL)
   {
 	  vme = check_add_valid(str);
-	  str = (char*)str + 1;
+	  str++;
   }
+ 
 }
 
 /**
@@ -456,6 +460,7 @@ read(int fd, void* buffer, unsigned size)
 		return ans;
 	}
 	lock_release(&filesys_lock);
+
 	return -1;
 }
 

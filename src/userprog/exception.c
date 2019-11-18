@@ -153,35 +153,37 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
-  printf("page fault: %x \n", fault_addr);
+  //printf("page fault: %x \n", fault_addr);
 
   if (!user) {
-	  printf("not user: %x\n", fault_addr);
+	  //printf("not user: %x\n", fault_addr);
 	  exit(-1);
   }
 
   if (not_present) 
   {
-	  printf("not_present\n");
-	  //if ((void*)fault_addr < 0x8048000 || (void*)fault_addr >= 0xc0000000)
-	  //{
+	  if ((void*)fault_addr < 0x8048000 || (void*)fault_addr >= 0xc0000000)
+	  {
 		 // printf("page fault 1: %u\n", fault_addr);
-		 // exit(-1);
-	  //}
+		  exit(-1);
+	  }
 
 	  //find struct vm_entry for page fault address
 	  vme = find_vme(fault_addr);
+	  //printf("find vme\n");
 	  if (vme == NULL)
 	  {
-		  printf("page fault 2\n");
+		  //printf("page fault 2\n");
 		  exit(-1);
 	  }
 	  //call page fault handler 
+	  //printf("calling handler about %x\n", fault_addr);
 	  res_page_fault = page_fault_handler(vme);
+	  //printf("handled %x\n", fault_addr);
 
 	  if (!res_page_fault)
 	  {
-		  printf("page fault 4\n");
+		  //printf("page fault 4\n");
 		  exit(-1);
 	  }
   }
@@ -190,11 +192,11 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
+  //printf ("Page fault at %p: %s error %s page in %s context.\n",
+  //        fault_addr,
+  //        not_present ? "not present" : "rights violation",
+  //        write ? "writing" : "reading",
+  //        user ? "user" : "kernel");
   
   
 }

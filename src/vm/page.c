@@ -113,15 +113,17 @@ find_vme(void* va)
 {
   void* start_virtual_page;
   struct hash_elem* e; 
-  struct vm_entry* vme; //struct that hash_elem e is in 
-
+  struct vm_entry vme; //struct that hash_elem e is in 
+  //printf("enter find_vme. virtual address is %x\n", va);
   start_virtual_page = pg_round_down(va);
-  vme->va = va; 
-
-  e = hash_find(&thread_current()->vm, &(vme->elem)); 
+  //printf("virtual page is %x\n", start_virtual_page);
+  vme.va = start_virtual_page; 
+  //printf("try to find hash\n");
+  e = hash_find(&thread_current()->vm, &(vme.elem)); 
+  //printf("hash found\n");
 
   if (e == NULL) {
-	  printf("cannot find vme: %d\n", (int)va);
+	  //printf("cannot find vme: %d\n", (int)va);
     return NULL; 
   } else {
     return  hash_entry(e, struct vm_entry, elem);

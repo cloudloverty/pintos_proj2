@@ -674,6 +674,7 @@ setup_stack (void **esp)
     {
       upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
       success = install_page (upage, kpage, true);
+<<<<<<< HEAD
       if (success) 
 	  {
 		  *esp = PHYS_BASE;
@@ -699,6 +700,26 @@ setup_stack (void **esp)
 		  palloc_free_page(kpage);
 		  return false;
 	  }
+=======
+      if (success) {
+        ////////// Added in P3 start /////////
+        *esp = PHYS_BASE;
+        //initialize vm_entry for 4KB stack 
+        vme = malloc(sizeof (struct vm_entry));
+
+        //set members of the vm_entry 
+        //TODO: va, write_permission, is_loaded_to_memory unclear
+        vme->file_type = VM_SWAP;
+        vme->va = upage;                
+        vme->write_permission = true;    
+        vme->is_loaded_to_memory = true;
+
+        //insert created vm_entry into vm hash table of thread 
+        insert_vme(&thread_current()->vm, vme);
+        ////////// Added in P3 end /////////
+    } else
+      palloc_free_page (kpage);
+>>>>>>> 98375323140693ac4cc5dfa9af940c2cead9a45f
     }
 
   return success;
@@ -779,11 +800,12 @@ page_fault_handler (struct vm_entry* vme)
   
   switch(vme->file_type) {
     case VM_BIN:  
-      if (!load_file(kaddr, vme))
+      if (!load_file(kaddr, vme)) {
+        palloc_free_page(kaddr);
         return false;
+      }
       res = install_page(vme->va, kaddr, vme->write_permission);
       if (!res) {
-        palloc_free_page(kaddr);
       }
       break;
     case VM_FILE:

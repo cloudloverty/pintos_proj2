@@ -174,11 +174,15 @@ check_add_valid(void* addr)
   struct vm_entry* vme; 
 
 	if ((uint32_t)addr <= 0x8048000 || (uint32_t)addr >= 0xc0000000)
+	{
+		printf("check_add_valid 1\n");
 		exit(-1);
+	}
   
   vme = find_vme(addr);
 
   if (vme == NULL) {
+	  printf("check_add_valid 2\n");
     exit(-1);
   } else {
     return vme;
@@ -204,11 +208,17 @@ check_buffer_validity(void* buffer, unsigned size,
 
     //check whether vm_entry exisits, and if it exists, check read-write 
     //permission
-    if (vme == NULL) 
-      exit(-1);
+	if (vme == NULL) 
+	{
+		printf("check_buffer_validity 1\n");
+		exit(-1);
+	}
     
-    if (to_write && vme->write_permission == false) 
-      exit (-1);
+	if (to_write && vme->write_permission == false) 
+	{
+		printf("check_buffer_validity 2\n");
+		exit(-1);
+	}
 
     buffer += PGSIZE;
     size -= PGSIZE;

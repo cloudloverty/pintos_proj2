@@ -87,9 +87,7 @@ main (void)
 
   /* Initialize ourselves as a thread so we can use locks,
      then enable console locking. */
-  printf("try thread_init\n");
   thread_init ();
-  printf("thread_init success\n");
   console_init ();  
 
   /* Greet user. */

@@ -10,6 +10,7 @@
     "malloc.h": "c",
     "stdio.h": "c",
     "pagedir.h": "c",
-    "string.h": "c"
+    "string.h": "c",
+    "*.inc": "c"
   }
 }

@@ -98,8 +98,8 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   case SYS_READ:
 	  set_arg(f->esp, argv, 3);
-	  check_buffer_validity((void*) * (uint32_t*)argv[1], (unsigned) * (uint32_t*)argv[2],
-                          f->esp, true);
+	  check_buffer_validity((void*) * (uint32_t*)argv[1], 
+                          (unsigned) * (uint32_t*)argv[2], f->esp, true);
 	  f->eax = read((int) * (uint32_t*)argv[0], 
                   (void*) * (uint32_t*)argv[1], 
                   (unsigned) * (uint32_t*)argv[2]);
@@ -128,6 +128,16 @@ syscall_handler (struct intr_frame *f UNUSED)
 	  close((int) * (uint32_t*)argv[0]);
 	  break;
 
+  case SYS_MMAP:
+    set_arg(f->esp, argv, 2);
+    check_add_valid((void*) * (uint32_t*)argv[1]);
+	  f->eax = mmap((int) * (uint32_t*)argv[0], (void*) * (uint32_t*)argv[1]);
+	  break;
+  
+  case SYS_MUNMAP:
+    set_arg(f->esp, argv, 1);
+	  munmap((int) * (uint32_t*)argv[0]);
+	  break;
   }
 }
 
@@ -181,7 +191,7 @@ check_add_valid(void* addr)
   vme = find_vme(addr);
 
   if (vme == NULL) {
-	  ///printf("check_add_valid 2\n");
+	  //printf("check_add_valid 2\n");
     exit(-1);
   } else {
     return vme;
@@ -201,11 +211,13 @@ check_buffer_validity(void* buffer, unsigned size,
                       void* esp, bool to_write) 
 { 
   struct vm_entry* vme;
+  void* buffer_buffer = buffer;
   //printf("param status, %p, %d", buffer, size);
 
   while (size > 0) {
-    vme = check_add_valid(buffer);
-	//printf("check_buffer_validity %p, %u\n", buffer, size);
+    //printf("check_buffer_validity %p, %u\n", buffer_buffer, size);
+
+    vme = check_add_valid(buffer_buffer);
 
 
     //check whether vm_entry exisits, and if it exists, check read-write 
@@ -221,7 +233,7 @@ check_buffer_validity(void* buffer, unsigned size,
 		//printf("check_buffer_validity 2\n");
 		exit(-1);
 	}
-    buffer++;
+    buffer_buffer++;
     size--;
 	//printf("check_buffer_validity success\n", buffer);
 
@@ -301,7 +313,7 @@ exit(int status)
 pid_t		//2
 exec(const char* cmd_line)
 {
-	check_add_valid(cmd_line);
+	//check_add_valid(cmd_line);
 
 	if (*cmd_line == NULL) exit(-1);
 	//return process_execute(cmd_line);
@@ -360,7 +372,7 @@ wait(pid_t pid)
 bool		//4
 create(const char* file, unsigned initial_size)
 {
-	check_add_valid(file);
+	//check_add_valid(file);
 
 	if (*file == NULL) exit(-1);
 	return filesys_create(file, initial_size);
@@ -376,7 +388,7 @@ create(const char* file, unsigned initial_size)
 bool		//5
 remove(const char* file)
 {
-	check_add_valid(file);
+	//check_add_valid(file);
 
 	if (*file == NULL) exit(-1);
 	return filesys_remove(file);
@@ -392,7 +404,7 @@ remove(const char* file)
 int			//6
 open(const char* file)
 {
-	check_add_valid(file);
+	//check_add_valid(file);
 	if (file == NULL) return -1;
 
 	lock_acquire(&filesys_lock);
@@ -437,7 +449,7 @@ filesize(int fd)
 int			//8
 read(int fd, void* buffer, unsigned size)
 {
-	check_add_valid(buffer);
+
 	lock_acquire(&filesys_lock);
 
 	if (fd == 0)
@@ -453,7 +465,6 @@ read(int fd, void* buffer, unsigned size)
 			return -1; 
 		}
 
-		
 		int ans = file_read(f, buffer, size);
 		lock_release(&filesys_lock);
 
@@ -481,7 +492,7 @@ read(int fd, void* buffer, unsigned size)
 int			//9
 write(int fd, const void* buffer, unsigned size)
 {
-	check_add_valid(buffer);
+	//check_add_valid(buffer);
 	lock_acquire(&filesys_lock);
 
 	if (fd == 1)
@@ -497,7 +508,6 @@ write(int fd, const void* buffer, unsigned size)
 			return -1; 
 		}
 
-		
 		int ans = file_write(f, buffer, size);
 		
 		lock_release(&filesys_lock);
@@ -556,6 +566,90 @@ close(int fd)
 	close_file(fd);
 }
 
+/**
+ * @param fd    file descriptor to map to @param addr
+ * @param addr  page-aligned address to start mapping 
+ * @returns     map_id if returned mmap() was successful, or error code(-1)
+ * Maps @param fd to virtual address @param addr. 
+ */ 
+mapid_t 
+mmap(int fd, void* addr) 
+{
+  int mmap_id;
+  int file_length;
+  int offset;
+  struct file* file_pt_of_fd;
+  struct file* new_file;
+  struct mmap_file* mmap_file;
+  struct vm_entry* vm_entry;
+
+  //mmap fails if file size is 0, @param addr is not page aligned,
+  //address is already in use, or addr is STDIN / STDOUT
+  file_length = filesize(fd);
+  if (file_length== 0)
+    return -1;
+  if (find_vme(addr) != NULL)
+    return -1;
+  if ((unsigned int)addr % PGSIZE != 0)
+    return -1;
+  if (fd == 0 || fd == 1) 
+    return -1;
+  
+  file_pt_of_fd =get_file(fd);
+  new_file = file_reopen(file_pt_of_fd);
+  offset = 0;
+
+  mmap_id = thread_current()->mmap_id_max;
+  thread_current()->mmap_id_max++;
+
+  mmap_file = (struct mmap_file*) malloc (sizeof (struct mmap_file));
+
+  if (mmap_file == NULL)
+    return -1;
+  
+  mmap_file->mapping_id = mmap_id;
+  mmap_file->file = new_file;
+  list_init(&mmap_file->vme_list);
+
+  list_push_back(&thread_current()->mmap_list, &mmap_file->elem);
+  
+  while (file_length > 0) {
+    if (find_vme(addr) != NULL)
+      return -1;
+    
+    vm_entry = (struct vm_entry *)calloc(sizeof (struct vm_entry), 1);
+    vm_entry->file_type = VM_FILE;
+    vm_entry->file = new_file;
+    vm_entry->offset = offset;
+    vm_entry->write_permission = true;
+    if (file_length >= PGSIZE) {
+      vm_entry->read_bytes = PGSIZE;
+    } else {
+      vm_entry->read_bytes = file_length;
+    }
+    vm_entry->zero_bytes = PGSIZE - vm_entry->read_bytes;
+    vm_entry->is_loaded_to_memory = true;
+    vm_entry->va = addr;  
+
+    addr += PGSIZE;
+    file_length -= PGSIZE;
+    offset += PGSIZE;
+  }
+
+  return mmap_id;
+}
+
+/**
+ * @param mapid id of mapped mm_file 
+ * Unmap that mapped file denoted by @param mapid 
+ */ 
+void 
+munmap(mapid_t mapid) 
+{
+  
+}
+
+
 /** 
  * @param file pointer to struct file
  * @return file descritptor for file 
@@ -609,4 +703,5 @@ close_file(int fd)
 	file_close(f);
 	thread_current()->fd_table[fd] = NULL;
 }
+
 

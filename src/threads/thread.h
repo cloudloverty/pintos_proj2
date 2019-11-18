@@ -115,7 +115,9 @@ struct thread
     
     /* Used in P3*/
     struct hash vm;             /* Hash table to manage virtual addres space*/
-
+    struct list mmap_list;      //list of mmap files
+    int mmap_id_max;            //mmap number to assign 
+  
     #ifdef USERPROG
         /* Owned by userprog/process.c. */
         uint32_t *pagedir;                  /* Page directory. */

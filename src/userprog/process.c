@@ -450,7 +450,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
   if (file == NULL) 
     {
 	  lock_release(&load_lock);
-      printf ("load: %s: open failed\n", file_name);
+      //printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
 
@@ -467,7 +467,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-      printf ("load: %s: error loading executable\n", file_name);
+      //printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
 
@@ -737,7 +737,8 @@ get_child_process(int pid)
 	struct thread* c;
 	struct list_elem* e;
 	//printf("trying get child process... \n");
-	for (e = list_begin(&t->child_list); e != list_end(&t->child_list); e = list_next(e))
+	for (e = list_begin(&t->child_list); 
+  e != list_end(&t->child_list); e = list_next(e))
 	{
 		c = list_entry(e, struct thread, child_elem);
 		if (c->tid == pid) {
@@ -782,6 +783,7 @@ page_fault_handler (struct vm_entry* vme)
   
   switch(vme->file_type) {
     case VM_BIN:  
+    case VM_FILE:
       if (!load_file(kaddr, vme)) {
         palloc_free_page(kaddr);
         return false;
@@ -791,9 +793,6 @@ page_fault_handler (struct vm_entry* vme)
       if (!res) {
 		  return false;
       }
-      break;
-    case VM_FILE:
-
       break;
     case VM_SWAP:
 

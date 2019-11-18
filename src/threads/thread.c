@@ -489,6 +489,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_push_back (&all_list, &t->allelem);
 
   list_init(&t->child_list);
+  list_init(&t->mmap_list);
   sema_init(&t->sema_load, 0);
   sema_init(&t->sema_exit, 0);
   sema_init(&t->sema_sync, 0);
@@ -496,6 +497,7 @@ init_thread (struct thread *t, const char *name, int priority)
   for (int i = 0; i < 128; i++)
 	  t->fd_table[i] = NULL;
   t->fd_max = 3;
+  t->mmap_id_max = 0;
 
   intr_set_level (old_level);
 }

@@ -23,6 +23,8 @@ int write(int, const void*, unsigned);
 void seek(int, unsigned);
 unsigned tell(int);
 void close(int);
+int mmap(int fd, void* addr);
+void munmap(mapid_t mapid);
 
 int new_file(struct file*);
 struct file* get_file(int);

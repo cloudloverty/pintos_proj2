@@ -31,7 +31,15 @@ struct vm_entry {
   size_t read_bytes;    //number of bytes readable 
   size_t zero_bytes;        // numbetr of byets to 0 out
   
-  struct hash_elem elem; 
+  struct hash_elem elem; //elem for hash table of thread 
+  struct list_elem mmap_elem; //for elem of vme_list of mmap_file
+};
+
+struct mmap_file {
+  int mapping_id; //mapping id returned on successful completion of mmap()
+  struct file* file; //mapped file
+  struct list_elem elem; //for mmap_list of mmap files
+  struct list vme_list; //for managing all vm_entry mapping to mmap_file
 };
 
 void vm_init (struct hash* vm);

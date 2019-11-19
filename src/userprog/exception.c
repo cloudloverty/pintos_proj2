@@ -175,8 +175,9 @@ page_fault (struct intr_frame *f)
 	  {
 		  //printf("page fault 2\n");
 		  if (USER_STACK_GROW_LIMIT >= f->esp - fault_addr) {
-			  if (grow_stack(fault_addr))
+			  if (grow_stack(fault_addr)) {
 				  goto done;
+			  }
 		  }
 		  exit(-1);
 	  }

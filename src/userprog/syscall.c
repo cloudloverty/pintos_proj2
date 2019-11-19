@@ -202,10 +202,15 @@ check_add_valid(void* addr, void* esp)
   //}
 
   if (vme == NULL) {
-	  //printf("check_add_valid 2\n");
+	  if (USER_STACK_GROW_LIMIT >= esp - addr && grow_stack(addr)) {
+		  vme = find_vme(addr);
+		  goto done;
+	}
+	//printf("check_add_valid 2\n");
     exit(-1);
   }
-
+  
+  done:
   return vme;
 }
 

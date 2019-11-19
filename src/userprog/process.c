@@ -838,17 +838,28 @@ grow_stack(void* addr)
 	/* No heuristic check here, check heuristic validity before using this function */
 	void* page_addr = pg_round_down(addr);
 
-	/* address validity check */
+	/* stack should be smaller than 8MB */
 	if (page_addr < USER_STACK_BOTTOM) {
-		return false
-	}
-	if ( )
-
-
-	/*
-	//Create vm_entry using malloc()
-	struct vm_entry* vme = (struct vm_entry*) malloc(sizeof(struct vm_entry));
-	if (vme == NULL)
 		return false;
-	*/
+	}
+
+	//kpage = alloc page()
+	uint8_t* kpage = palloc_get_page (PAL_USER);
+
+
+	/* creat and init vm_entry of page */
+	struct vm_entry* vme = (struct vm_entry*) malloc(sizeof(struct vm_entry));
+	if (vme == NULL) {
+		return false;
+	}
+
+	vme->file_type = VM_SWAP;
+	vme->write_permission = true;
+	vme->is_loaded_to_memory = true;
+	vme->va = page_addr;
+
+	if (!install_page(page_addr, kpage, true)) {
+		return false;
+	}
+
 }

@@ -155,6 +155,11 @@ page_fault (struct intr_frame *f)
 
   //printf("page fault: %x \n", fault_addr);
 
+  if ((void*)fault_addr < 0x8048000 || (void*)fault_addr >= 0xc0000000)
+  {
+	  // printf("page fault 1: %u\n", fault_addr);
+	  exit(-1);
+  }
   if (!user) {
 	  //printf("not user: %x\n", fault_addr);
 	  exit(-1);
@@ -162,11 +167,7 @@ page_fault (struct intr_frame *f)
 
   if (not_present) 
   {
-	  if ((void*)fault_addr < 0x8048000 || (void*)fault_addr >= 0xc0000000)
-	  {
-		 // printf("page fault 1: %u\n", fault_addr);
-		  exit(-1);
-	  }
+
 
 	  //find struct vm_entry for page fault address
 	  vme = find_vme(fault_addr);

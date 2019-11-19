@@ -180,7 +180,7 @@ static struct vm_entry*
 check_add_valid(void* addr)
 {
   struct vm_entry* vme; 
-  //printf("check_add_valid with %p", addr);
+  //printf("check_add_valid with %p\n", addr);
 
 	if ((uint32_t)addr < 0x8048000 || (uint32_t)addr >= 0xc0000000)
 	{
@@ -449,7 +449,7 @@ filesize(int fd)
 int			//8
 read(int fd, void* buffer, unsigned size)
 {
-  //printf("fd: %d, p: %p,size: %u\n", fd, buffer, size);
+  printf("fd: %d, p: %p,size: %u\n", fd, buffer, size);
 	lock_acquire(&filesys_lock);
 
 	if (fd == 0)

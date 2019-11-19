@@ -183,3 +183,20 @@ load_file(void* kaddr, struct vm_entry* vme)
   }
   return true; 
 }
+
+/**
+ * @param flags Flags used for palloc
+ * 
+ * Allocate page frame from using palloc_get_page() 
+ */
+struct page*
+allocate_page (enum palloc_flags flags)
+{
+  void* new_page;
+  struct page* new_page_struct;
+
+  new_page = palloc_get_page(flags);
+  new_page_struct = (struct page*) malloc (sizeof (struct page));
+  new_page_struct->page_thread = thread_current();
+
+} 

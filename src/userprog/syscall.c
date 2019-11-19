@@ -597,7 +597,7 @@ mmap(int fd, void* addr)
   if (fd == 0 || fd == 1) 
     return -1;
   
-  file_pt_of_fd =get_file(fd);
+  file_pt_of_fd = get_file(fd);
   new_file = file_reopen(file_pt_of_fd);
   offset = 0;
 
@@ -630,8 +630,11 @@ mmap(int fd, void* addr)
       vm_entry->read_bytes = file_length;
     }
     vm_entry->zero_bytes = PGSIZE - vm_entry->read_bytes;
-    vm_entry->is_loaded_to_memory = true;
+    vm_entry->is_loaded_to_memory = false;
     vm_entry->va = addr;  
+
+    list_push_back (&mmap_file->vme_list, &vm_entry->mmap_elem);
+    insert_vme (&thread_current ()->vm, vm_entry);
 
     addr += PGSIZE;
     file_length -= PGSIZE;

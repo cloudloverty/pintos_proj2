@@ -58,4 +58,6 @@ void hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED);
 
 bool load_file(void* kaddr, struct vm_entry* vme);
 
+struct page* allocate_page (enum palloc_flags flags);
+
 #endif

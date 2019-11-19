@@ -819,6 +819,7 @@ page_fault_handler (struct vm_entry* vme)
       if (!res) {
 		  return false;
       }
+      vme->is_loaded_to_memory = true;
       break;
     case VM_SWAP:
 

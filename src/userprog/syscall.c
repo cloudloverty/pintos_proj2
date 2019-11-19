@@ -13,6 +13,7 @@
 
 static void syscall_handler (struct intr_frame *);
 static struct vm_entry* check_add_valid(void* addr, void* esp);
+static struct vm_entry* check_add_valid_simple(void* addr);
 static void check_buffer_validity(void* buffer, unsigned size, 
                                   void* esp, bool to_write);
 static void check_valid_string(const void* str, void* esp);
@@ -154,14 +155,14 @@ set_arg(void* esp, uint32_t* argv, int argc)
 {
 	//printf("esp point to %d\n", (int) * (uint32_t*)(esp));
 	//printf("esp address is %x\n", esp);
-	check_add_valid(esp);
+	check_add_valid_simple(esp);
 
 	esp += 4;							// skip syscall number
 	for (int i = 0; i < argc; i++)
 	{
 		//printf("%d roop\n", i);
 		//printf("esp address is %x\n", esp);
-		check_add_valid(esp+3);
+		check_add_valid_simple(esp+3);
 		argv[i] = (uint32_t*) esp;
 		
 		//printf("esp point to %d\n", (int) * (uint32_t*)(esp));
@@ -190,14 +191,15 @@ check_add_valid(void* addr, void* esp)
   
   vme = find_vme(addr);
 
-  if (!vme) {
-	  return vme;
-  }
-  else if (USER_STACK_GROW_LIMIT >= esp - addr) {	// valid address -> expand stack
-	  if (!grow_stack(addr)) {
-		  exit(-1);
-	  }
-  }
+  //if (!vme) {
+	 // return vme;
+  //}
+  //else if (USER_STACK_GROW_LIMIT >= esp - addr) {	// valid address -> expand stack
+	 // if (!grow_stack(addr)) {
+		//  printf("stack grow fail\n");
+		//  exit(-1);
+	 // }
+  //}
 
   if (vme == NULL) {
 	  //printf("check_add_valid 2\n");
@@ -205,6 +207,21 @@ check_add_valid(void* addr, void* esp)
   }
 
   return vme;
+}
+
+static struct vm_entry*
+check_add_valid_simple(void* addr)
+{
+	struct vm_entry* vme;
+
+	if ((uint32_t)addr < 0x8048000 || (uint32_t)addr >= 0xc0000000)
+		exit(-1);
+
+	vme = find_vme(addr);
+	if (vme == NULL)
+		exit(-1);
+
+	return vme;
 }
 
 /**
@@ -326,8 +343,7 @@ pid_t		//2
 exec(const char* cmd_line)
 {
 	//check_add_valid(cmd_line);
-	if ((uint32_t)cmd_line < 0x8048000 || (uint32_t)cmd_line >= 0xc0000000 || !find_vme(addr))
-		exit(-1);
+	check_add_valid_simple(cmd_line);
 
 
 	if (*cmd_line == NULL) exit(-1);

@@ -174,6 +174,10 @@ page_fault (struct intr_frame *f)
 	  if (vme == NULL)
 	  {
 		  //printf("page fault 2\n");
+		  if (USER_STACK_GROW_LIMIT >= f->esp - fault_addr) {
+			  if (grow_stack(fault_addr))
+				  goto done;
+		  }
 		  exit(-1);
 	  }
 	  //call page fault handler 
@@ -181,6 +185,7 @@ page_fault (struct intr_frame *f)
 	  res_page_fault = page_fault_handler(vme);
 	  //printf("handled %x\n", fault_addr);
 
+	  done:
 	  if (!res_page_fault)
 	  {
 		  //printf("page fault 4\n");

@@ -858,6 +858,8 @@ grow_stack(void* addr)
 	vme->is_loaded_to_memory = true;
 	vme->va = page_addr;
 
+	insert_vme(&thread_current()->vm, vme);
+
 	if (!install_page(page_addr, kpage, true)) {
 		return false;
 	}

@@ -831,9 +831,24 @@ page_fault_handler (struct vm_entry* vme)
   return res;
 }
 
+
 bool
 grow_stack(void* addr)
 {
+	/* No heuristic check here, check heuristic validity before using this function */
+	void* page_addr = pg_round_down(addr);
+
+	/* address validity check */
+	if (page_addr < USER_STACK_BOTTOM) {
+		return false
+	}
+	if ( )
 
 
+	/*
+	//Create vm_entry using malloc()
+	struct vm_entry* vme = (struct vm_entry*) malloc(sizeof(struct vm_entry));
+	if (vme == NULL)
+		return false;
+	*/
 }

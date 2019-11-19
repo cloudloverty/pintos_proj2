@@ -216,26 +216,24 @@ check_buffer_validity(void* buffer, unsigned size,
 
   while (size > 0) {
     //printf("check_buffer_validity %p, %u\n", buffer_buffer, size);
-
     vme = check_add_valid(buffer_buffer);
 
-
-    //check whether vm_entry exisits, and if it exists, check read-write 
-    //permission
-	if (vme == NULL) 
-	{
-		//printf("check_buffer_validity 1\n");
-		exit(-1);
-	}
-    
-	if (to_write && vme->write_permission == false) 
-	{
-		//printf("check_buffer_validity 2\n");
-		exit(-1);
-	}
-    buffer_buffer++;
-    size--;
-	//printf("check_buffer_validity success\n", buffer);
+      //check whether vm_entry exisits, and if it exists, check read-write 
+      //permission
+    if (vme == NULL) 
+    {
+      //printf("check_buffer_validity 1\n");
+      exit(-1);
+    }
+      
+    if (to_write && vme->write_permission == false) 
+    {
+      //printf("check_buffer_validity 2\n");
+      exit(-1);
+    }
+      buffer_buffer++;
+      size--;
+    //printf("check_buffer_validity success\n", buffer);
 
   }
 }
@@ -449,7 +447,7 @@ filesize(int fd)
 int			//8
 read(int fd, void* buffer, unsigned size)
 {
-
+  //printf("fd: %d, p: %p,size: %u\n", fd, buffer, size);
 	lock_acquire(&filesys_lock);
 
 	if (fd == 0)
@@ -646,7 +644,25 @@ mmap(int fd, void* addr)
 void 
 munmap(mapid_t mapid) 
 {
-  
+  struct mmap_file* mmap_file;
+  struct list_elem* e;
+  struct vm_entry* vme;
+
+  mmap_file = get_mmap_file(mapid);
+  if (mmap_file == NULL)
+    exit(-1);
+
+  e = list_begin(&mmap_file->vme_list);
+
+  for (; e != list_end(&mmap_file->vme_list);
+       e = list_next(e)) 
+    {
+      vme = list_entry(e, struct vm_entry, mmap_elem);
+      e = list_remove(e);
+      delete_vme(&thread_current()->vm, vme);
+    }
+  list_remove(&mmap_file->elem);
+  free(mmap_file);  
 }
 
 
@@ -704,4 +720,28 @@ close_file(int fd)
 	thread_current()->fd_table[fd] = NULL;
 }
 
+/**
+ * @param     mmap_id
+ * @returns   pointer to the mmap_file
+ * Gets the mmap_file denoted by @mmap_id in the mmap_list of the 
+ * current thread.
+ */ 
+struct mmap_file* 
+get_mmap_file(int mmap_id) 
+{
+  struct thread* t;
+  struct list_elem* e;
+  struct mmap_file* m;
 
+  t = thread_current();
+  e = list_begin(&thread_current()->mmap_list);
+
+  for (; e != list_end(&thread_current()->mmap_list); 
+       e = list_next(e)) 
+  {
+    m = list_entry(e, struct mmap_file, elem);
+    if (m->mapping_id == mmap_id)
+      return m;
+  }
+  return NULL;
+}

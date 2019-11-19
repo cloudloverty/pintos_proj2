@@ -304,6 +304,32 @@ process_exit (void)
 	  if (c->exit_success == true) process_wait(c->tid);
 	  else c->parent = NULL;
   }
+
+  int mmap_id;
+  struct mmap_file *mmap_file;
+  struct vm_entry* vme;
+  struct list_elem* next_e; 
+  mmap_id = 0;
+
+  for (; mmap_id < cur->mmap_id_max; mmap_id++)
+    {
+      mmap_file = get_mmap_file (mmap_id);
+      if (mmap_file) 
+      {
+        e = list_begin(&mmap_file->vme_list);
+
+        for (; e != list_end(&mmap_file->vme_list);
+            e = next_e) 
+          {
+            next_e = list_next(e);
+            vme = list_entry(e, struct vm_entry, mmap_elem);
+            e = list_remove(e);
+            delete_vme(&thread_current()->vm, vme);
+          }
+        list_remove(&mmap_file->elem);
+        free(mmap_file);  
+      }
+    }
   //////////////////////////////////////////////////////////////////////
 
 
@@ -776,7 +802,7 @@ page_fault_handler (struct vm_entry* vme)
   uint8_t* kaddr; //address of physical page 
   bool res;  
   //printf("page_fault_handler!!\n");
-  kaddr = palloc_get_page(PAL_ZERO);
+  kaddr = palloc_get_page(PAL_USER);
   if (kaddr == NULL) {
     return false;
   }

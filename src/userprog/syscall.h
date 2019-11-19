@@ -29,6 +29,7 @@ void munmap(mapid_t mapid);
 int new_file(struct file*);
 struct file* get_file(int);
 void close_file(int);
+struct mmap_file* get_mmap_file(int mmap_id);
 
 struct lock filesys_lock;
 

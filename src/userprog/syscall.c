@@ -449,12 +449,17 @@ filesize(int fd)
 int			//8
 read(int fd, void* buffer, unsigned size)
 {
-  printf("fd: %d, p: %p,size: %u\n", fd, buffer, size);
+  //printf("fd: %d, p: %p,size: %u\n", fd, buffer, size);
+  unsigned count;
 	lock_acquire(&filesys_lock);
 
 	if (fd == 0)
 	{
-		input_getc();
+    while (count != 0) {
+      *((char * )buffer) = input_getc();
+      buffer++;
+      count--;
+    }
 		lock_release(&filesys_lock);
 		return size;
 	}
@@ -665,7 +670,7 @@ munmap(mapid_t mapid)
        e = list_next(e)) 
     {
       vme = list_entry(e, struct vm_entry, mmap_elem);
-      e = list_remove(e);
+      list_remove(e);
       delete_vme(&thread_current()->vm, vme);
     }
   list_remove(&mmap_file->elem);

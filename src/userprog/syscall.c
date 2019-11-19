@@ -489,6 +489,7 @@ read(int fd, void* buffer, unsigned size)
   unsigned count;
 	lock_acquire(&filesys_lock);
 
+  count = size;
 	if (fd == 0)
 	{
     while (count != 0) {

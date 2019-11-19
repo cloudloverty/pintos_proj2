@@ -840,7 +840,11 @@ page_fault_handler (struct vm_entry* vme)
   return res;
 }
 
-
+/**
+ * @param   addr  address to check whether to grow stack 
+ * @returns       whether growth happen
+ * Grow stack if @param addr is applicable.
+ */ 
 bool
 grow_stack(void* addr)
 {

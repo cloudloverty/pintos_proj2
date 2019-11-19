@@ -32,6 +32,8 @@ struct vm_entry {
   size_t read_bytes;    //number of bytes readable 
   size_t zero_bytes;        // numbetr of byets to 0 out
   
+  size_t swap_slot;     //swap_slot for vm_entry
+
   struct hash_elem elem; //elem for hash table of thread 
   struct list_elem mmap_elem; //for elem of vme_list of mmap_file
 };
@@ -67,7 +69,8 @@ struct page* find_page_from_frame_table(void* addr);
 void remove_page_from_table (struct page* page);
 
 void init_swap_space(size_t size_of_swap_space);
-void vm_swap_in();
-void vm_swap_out();
+void vm_swap_in(void* addr, size_t index);
+size_t vm_swap_out(void* addr);
+void* evict_clock_victim();
 
 #endif

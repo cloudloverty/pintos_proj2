@@ -30,6 +30,7 @@
 #include "userprog/tss.h"
 #else
 #include "tests/threads/tests.h"
+#include "vm/page.h"
 #endif
 #ifdef FILESYS
 #include "devices/block.h"
@@ -115,6 +116,9 @@ main (void)
   syscall_init ();
 #endif
 
+  init_swap_space((size_t) 8024);
+  init_frame_table();
+  
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
   serial_init_queue ();

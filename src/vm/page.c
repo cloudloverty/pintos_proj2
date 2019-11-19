@@ -2,6 +2,7 @@
 
 #include "vm/page.h"
 #include "userprog/process.h"
+#include "devices/block.h"
 
 static unsigned vm_hash_func(const struct hash_elem* e, void* aux);
 static bool vm_hash_less_func (const struct hash_elem* a, 
@@ -16,7 +17,7 @@ struct lock swap_space_lock;
 
 struct list_elem* clock_victim;
 
-struct bitmap* swap_sapce;
+struct bitmap* swap_space;
 
 /**
  * @param vm Hash table to initializae 
@@ -214,7 +215,8 @@ init_frame_table(void)
 void 
 init_swap_space(size_t size_of_swap_space)
 {
-  swap_sapce = bitmap_create(size_of_swap_space);
+  swap_space = bitmap_create(size_of_swap_space);
+  bitmap_set_all(swap_space, true);
   lock_init(&swap_space_lock); 
 }
 
@@ -233,8 +235,14 @@ allocate_page (enum palloc_flags flags)
   new_page_struct = (struct page*) malloc (sizeof (struct page));
 
   new_page_struct->page_thread = thread_current();
-  new_page_struct->physical_addr = new_page;
   
+  while (new_page == NULL) {
+    reap_lru();
+    new_page = palloc_get_page(flags);
+  }
+
+  new_page_struct->physical_addr = new_page; 
+
   push_page_to_table(new_page_struct);
 
   return new_page_struct;
@@ -308,6 +316,109 @@ find_page_from_frame_table(void* addr)
   return NULL; 
 } 
 
+/**
+ * @param addr  Address to swap in 
+ * @param index Index in swap space to swap in.
+ * 
+ * Swap in contents in @param addr to @param index of swap space. 
+ */ 
+void 
+vm_swap_in (void* addr, size_t index)
+{
+  int i;  
+  size_t swap_index;
+  struct block* block;
+
+  block = block_get_role(BLOCK_SWAP);
+
+}
+
+/**
+ * @param addr  Address to swap out 
+ * 
+ * Swap contents out from @param addr to swap space. 
+ */ 
+size_t 
+vm_swap_out(void* addr) 
+{
+  size_t i;
+
+  i = 0;
+
+  for (; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
+
+  }
+
+}
+
+/**
+ * @return evicted victim by the clock algorithm 
+ * 
+ * Evict a victim from the LRU list per the clock algorithm.
+ */ 
+void* 
+evict_clock_victim(void) 
+{
+  struct list_elem* clock_victim;
+  struct page* page;
+  bool access_status;
+
+  while (true) {
+    clock_victim = find_clock_victim();
+    page = list_entry(clock_victim, struct page, lru);
+    if (page->vme != NULL) {
+      access_status = pagedir_is_accessed(thread_current()->pagedir, 
+                                          page->vme->va);
+      if (access_status) {
+        pagedir_set_accessed(thread_current()->pagedir, 
+                             page->vme->va, false);
+      } else {
+        break;
+      }
+    }
+  }
+  list_remove(clock_victim);
+  return page;  
+}
+
+/** 
+ * Reap LRU entries such that palloc_get_page works
+ */ 
+void 
+reap_lru(void)
+{
+  struct page* page;
+  bool dirty_bit;
+
+  page = evict_clock_victim();
+  dirty_bit = pagedir_is_dirty(page->page_thread->pagedir, page->vme->va);
+  
+  switch(page->vme->file_type) {
+    case VM_BIN:
+      if (dirty_bit) {
+        page->vme->swap_slot = vm_swap_out(page->physical_addr);
+        page->vme->file_type = VM_SWAP;
+      }
+      break;  
+    case VM_FILE:
+      if (dirty_bit) {
+        file_write_at (page->vme->file, page->vme->va, page->vme->read_bytes,
+                       page->vme->offset);
+      }
+      break;
+    case VM_SWAP:
+      if (dirty_bit) 
+        page->vme->swap_slot = vm_swap_out(page->physical_addr);
+      break;
+  }
+
+  pagedir_clear_page (page->page_thread->pagedir, page->vme->va);
+  page->vme->is_loaded_to_memory = false;
+  palloc_free_page (page->physical_addr);
+  free (page);
+
+}
+
 /** 
  * @returns list_elem* of the next victim to evict 
  * 
@@ -315,7 +426,8 @@ find_page_from_frame_table(void* addr)
  * get the first elem of the frame_table list 
  */ 
 static struct list_elem* 
-find_clock_victim() {
+find_clock_victim(void) 
+{
   if (clock_victim == NULL) { 
     if(list_empty(&frame_table)) {
       clock_victim = NULL;

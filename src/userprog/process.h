@@ -4,6 +4,8 @@
 #include "threads/thread.h" 
 #include "vm/page.h"
 
+#define USER_STACK_GROW_LIMIT	32							// growth limit
+#define USER_STACK_BOTTOM		(0xc0000000 - 0x800000)		// stack expand at most 8MB
 
 tid_t process_execute (const char *file_name);
 int process_wait (tid_t);

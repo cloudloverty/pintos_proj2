@@ -12,7 +12,8 @@
 
 
 static void syscall_handler (struct intr_frame *);
-static struct vm_entry* check_add_valid(void* addr);
+static struct vm_entry* check_add_valid(void* addr, void* esp);
+static struct vm_entry* check_add_valid_simple(void* addr);
 static void check_buffer_validity(void* buffer, unsigned size, 
                                   void* esp, bool to_write);
 static void check_valid_string(const void* str, void* esp);
@@ -45,7 +46,7 @@ syscall_handler (struct intr_frame *f UNUSED)
 	//printf("esp address is %x\n", f->esp);
 	//hex_dump(f->esp, f->esp, 96, true);
 
-  check_add_valid((uint32_t)f->esp);
+  check_add_valid((uint32_t)f->esp, f->esp);
   uint32_t syscall_num = *(uint32_t*)f->esp;
   //printf("syscall number: %d\n", syscall_num);
   uint32_t argv[3];
@@ -154,14 +155,14 @@ set_arg(void* esp, uint32_t* argv, int argc)
 {
 	//printf("esp point to %d\n", (int) * (uint32_t*)(esp));
 	//printf("esp address is %x\n", esp);
-	check_add_valid(esp);
+	check_add_valid_simple(esp);
 
 	esp += 4;							// skip syscall number
 	for (int i = 0; i < argc; i++)
 	{
 		//printf("%d roop\n", i);
 		//printf("esp address is %x\n", esp);
-		check_add_valid(esp+3);
+		check_add_valid_simple(esp+3);
 		argv[i] = (uint32_t*) esp;
 		
 		//printf("esp point to %d\n", (int) * (uint32_t*)(esp));
@@ -177,7 +178,7 @@ set_arg(void* esp, uint32_t* argv, int argc)
  * Checks the validity of @param addr. 
  */ 
 static struct vm_entry* 
-check_add_valid(void* addr)
+check_add_valid(void* addr, void* esp)
 {
   struct vm_entry* vme; 
   //printf("check_add_valid with %p\n", addr);
@@ -190,12 +191,37 @@ check_add_valid(void* addr)
   
   vme = find_vme(addr);
 
+  //if (!vme) {
+	 // return vme;
+  //}
+  //else if (USER_STACK_GROW_LIMIT >= esp - addr) {	// valid address -> expand stack
+	 // if (!grow_stack(addr)) {
+		//  printf("stack grow fail\n");
+		//  exit(-1);
+	 // }
+  //}
+
   if (vme == NULL) {
 	  //printf("check_add_valid 2\n");
     exit(-1);
-  } else {
-    return vme;
   }
+
+  return vme;
+}
+
+static struct vm_entry*
+check_add_valid_simple(void* addr)
+{
+	struct vm_entry* vme;
+
+	if ((uint32_t)addr < 0x8048000 || (uint32_t)addr >= 0xc0000000)
+		exit(-1);
+
+	vme = find_vme(addr);
+	if (vme == NULL)
+		exit(-1);
+
+	return vme;
 }
 
 /**
@@ -216,12 +242,13 @@ check_buffer_validity(void* buffer, unsigned size,
 
   while (size > 0) {
     //printf("check_buffer_validity %p, %u\n", buffer_buffer, size);
-    vme = check_add_valid(buffer_buffer);
+    vme = check_add_valid(buffer_buffer, esp);
 
       //check whether vm_entry exisits, and if it exists, check read-write 
       //permission
     if (vme == NULL) 
     {
+	  //should call grow_stack?
       //printf("check_buffer_validity 1\n");
       exit(-1);
     }
@@ -255,7 +282,7 @@ check_valid_string(const void* str, void* esp)
   while (*((char*)str_str) != NULL)
   {
     //printf("checking valid string, %p\n", str_str);
-	  vme = check_add_valid(str_str);
+	  vme = check_add_valid(str_str, esp);
 	  str_str++;
   }
  
@@ -315,7 +342,9 @@ exit(int status)
 pid_t		//2
 exec(const char* cmd_line)
 {
-	check_add_valid(cmd_line);
+	//check_add_valid(cmd_line);
+	check_add_valid_simple(cmd_line);
+
 
 	if (*cmd_line == NULL) exit(-1);
 	//return process_execute(cmd_line);

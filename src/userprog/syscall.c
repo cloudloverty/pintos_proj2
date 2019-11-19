@@ -231,8 +231,10 @@ check_buffer_validity(void* buffer, unsigned size,
       //printf("check_buffer_validity 2\n");
       exit(-1);
     }
-      buffer_buffer++;
-      size--;
+    if (vme->is_loaded_to_memory == false ) 
+      page_fault_handler(vme);
+    buffer_buffer++;
+    size--;
     //printf("check_buffer_validity success\n", buffer);
 
   }
@@ -659,6 +661,9 @@ munmap(mapid_t mapid)
   struct mmap_file* mmap_file;
   struct list_elem* e;
   struct vm_entry* vme;
+  
+  bool vme_is_loaded ;
+  bool dirty_bit;
 
   mmap_file = get_mmap_file(mapid);
   if (mmap_file == NULL)
@@ -670,6 +675,12 @@ munmap(mapid_t mapid)
        e = list_next(e)) 
     {
       vme = list_entry(e, struct vm_entry, mmap_elem);
+      vme_is_loaded = vme->is_loaded_to_memory;
+      dirty_bit = pagedir_is_dirty(thread_current()->pagedir, vme->va);
+      if (vme_is_loaded && dirty_bit) 
+        file_write_at (vme->file, vme->va, vme->read_bytes, vme->offset);
+            
+      vme->is_loaded_to_memory = false;
       list_remove(e);
       delete_vme(&thread_current()->vm, vme);
     }

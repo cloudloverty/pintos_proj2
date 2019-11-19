@@ -15,4 +15,6 @@ void remove_child_process(struct thread*);
 
 bool page_fault_handler(struct vm_entry*);
 
+bool grow_stack(void*);
+
 #endif /* userprog/process.h */

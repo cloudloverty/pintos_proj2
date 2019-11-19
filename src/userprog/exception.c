@@ -168,8 +168,6 @@ page_fault (struct intr_frame *f)
 
   if (not_present) 
   {
-
-
 	  //find struct vm_entry for page fault address
 	  vme = find_vme(fault_addr);
 	  //printf("find vme\n");
@@ -188,6 +186,8 @@ page_fault (struct intr_frame *f)
 		  //printf("page fault 4\n");
 		  exit(-1);
 	  }
+  } else {
+    exit(-1);
   }
 
 

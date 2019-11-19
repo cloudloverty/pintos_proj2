@@ -814,10 +814,10 @@ page_fault_handler (struct vm_entry* vme)
         palloc_free_page(kaddr);
         return false;
       }
-	  //printf("page_fault_handler: %u\n", vme->va);
+	     //printf("page_fault_handler: %u\n", vme->va);
       res = install_page(vme->va, kaddr, vme->write_permission);
       if (!res) {
-		  return false;
+		    return false;
       }
       vme->is_loaded_to_memory = true;
       break;

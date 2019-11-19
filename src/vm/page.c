@@ -5,6 +5,11 @@ static unsigned vm_hash_func(const struct hash_elem* e, void* aux);
 static bool vm_hash_less_func (const struct hash_elem* a, 
                                const struct hash_elem* b,
                                void* AUX UNUSED);
+static struct list_elem* find_clock_victim();
+
+struct list frame_table;
+struct lock frame_table_access_lock;
+struct list_elem* clock_victim;
 
 /**
  * @param vm Hash table to initializae 
@@ -185,6 +190,16 @@ load_file(void* kaddr, struct vm_entry* vme)
 }
 
 /**
+ * Initializes the frame table and the frame_table_access_lock
+ */ 
+void 
+init_frame_table(void) 
+{
+  list_init(&frame_table);
+  lock_init(&frame_table_access_lock);
+}
+
+/**
  * @param flags Flags used for palloc
  * 
  * Allocate page frame from using palloc_get_page() 
@@ -197,6 +212,101 @@ allocate_page (enum palloc_flags flags)
 
   new_page = palloc_get_page(flags);
   new_page_struct = (struct page*) malloc (sizeof (struct page));
-  new_page_struct->page_thread = thread_current();
 
+  new_page_struct->page_thread = thread_current();
+  new_page_struct->physical_addr = new_page;
+  
+  push_page_to_table(new_page_struct);
+
+  return new_page_struct;
 } 
+
+/**
+ * @param addr address to freee 
+ * 
+ * Free the physical page frame of the @param addr by searching in 
+ * the lru list.
+ */ 
+void
+free_physical_page_frame(void* addr) 
+{
+  struct page* page;
+
+  lock_acquire(&frame_table_access_lock);
+  page = find_page_from_frame_table(addr);
+  list_remove(&page->lru);
+  pagedir_clear_page (page->page_thread->pagedir, page->vme->va);
+  palloc_free_page(page->physical_addr);
+
+  free(page);
+  lock_release(&frame_table_access_lock);
+}
+
+/**
+ * @param  page physical page frame to add to table
+ * 
+ * Adds page to the frame_table list 
+ */ 
+void 
+push_page_to_table(struct page* page_frame) 
+{
+  lock_acquire(&frame_table_access_lock);
+  list_push_back(&frame_table, &page_frame->lru);
+  lock_release(&frame_table_access_lock);
+}
+
+/**
+ * @param   page physical page frame to delete from frame table 
+ * 
+ * Delete @param page from frame_table 
+ */ 
+void 
+remove_page_from_table (struct page* page) 
+{
+  lock_acquire(&frame_table_access_lock);
+  list_remove(&page->lru);
+  lock_release(&frame_table_access_lock);
+}
+
+/**
+ * @param   addr  addr to look for in the frame table 
+ * 
+ * Find page of physical address @param addr. If there is no match, return 
+ * NULL.
+ */
+struct page*
+find_page_from_frame_table(void* addr) 
+{
+  struct list_elem* e;
+  struct page* page;
+
+  e = list_begin(&frame_table);
+  for (; e!= list_end(&frame_table); e = list_next(e)) {
+    page = list_entry(e, struct page, lru);
+    if (page->physical_addr == addr)
+      return page; 
+  }
+  return NULL; 
+} 
+
+/** 
+ * @returns list_elem* of the next victim to evict 
+ * 
+ * Returns the next victim based on the clock algorithm. If victim is NULL, 
+ * get the first elem of the frame_table list 
+ */ 
+static struct list_elem* 
+find_clock_victim() {
+  if (clock_victim == NULL) { 
+    if(list_empty(&frame_table)) {
+      clock_victim = NULL;
+    } else {
+      clock_victim = list_begin(&frame_table);
+    } // end of clock_victim == NULL
+  } else {
+    clock_victim = list_next(clock_victim);
+    if (clock_victim == NULL)
+      clock_victim = list_begin(&frame_table);
+  }
+  return clock_victim;
+}

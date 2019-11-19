@@ -58,6 +58,15 @@ void hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED);
 
 bool load_file(void* kaddr, struct vm_entry* vme);
 
+void init_frame_table(void);
+void free_physical_page_frame(void* addr);
+void push_page_to_table(struct page* page_frame);
 struct page* allocate_page (enum palloc_flags flags);
+struct page* find_page_from_frame_table(void* addr);
+void remove_page_from_table (struct page* page);
+
+void vm_swap_init();
+void vm_swap_in();
+void vm_swap_out();
 
 #endif

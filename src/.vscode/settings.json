@@ -11,6 +11,8 @@
     "stdio.h": "c",
     "pagedir.h": "c",
     "string.h": "c",
-    "*.inc": "c"
+    "*.inc": "c",
+    "input.h": "c",
+    "syscall.h": "c"
   }
 }

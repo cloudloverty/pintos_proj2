@@ -153,7 +153,8 @@ hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED)
   struct vm_entry* vme; //struct that hash_elem e is in 
   void* start_of_page; 
   
-  //vme = (struct vm_entry*) hash_entry(e, struct vm_entry, elem);
+  vme = (struct vm_entry*) hash_entry(e, struct vm_entry, elem);
+  free (hash_entry (e, struct vm_entry, elem));
   ///*if page is loaded to memory, free page and change page in PDE */
   //if (vme->is_loaded_to_memory == true) { 
   //  start_of_page = pg_round_down(vme->va);

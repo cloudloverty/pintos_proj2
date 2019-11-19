@@ -42,7 +42,14 @@ struct mmap_file {
   struct list vme_list; //for managing all vm_entry mapping to mmap_file
 };
 
-void vm_init (struct hash* vm);
+struct page {
+  void* physical_addr; //physical address of the page 
+  struct vm_entry* vme; //the vm_entry of the logical address 
+  struct thread* page_thread; //thread structure that the page is belonged to 
+  struct list_elem lru; // list_elem for the lru list
+};
+
+void vm_init (struct hash* vm); 
 bool insert_vme (struct hash* vm, struct vm_entry* vme);
 bool delete_vme (struct hash* vm, struct vm_entry* vme);
 struct vm_entry* find_vme(void* va);

@@ -4,7 +4,9 @@
 #include "threads/interrupt.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/process.h"
 #include "devices/shutdown.h"
+#include "devices/input.h"
 #include "filesys/filesys.h"
 #include "vm/page.h"
 
@@ -42,61 +44,58 @@ syscall_handler (struct intr_frame *f UNUSED)
 	//printf("syscall_handler\n");
 	//printf("esp address is %x\n", f->esp);
 	//hex_dump(f->esp, f->esp, 96, true);
-	//printf(*(uint32_t*)0x0804f000);
 
   check_add_valid((uint32_t)f->esp);
   uint32_t syscall_num = *(uint32_t*)f->esp;
   //printf("syscall number: %d\n", syscall_num);
-  //printf ("system call!\n");
   uint32_t argv[3];
 
-
   switch (syscall_num) {
-  case SYS_HALT:
+  case SYS_HALT: //0
 	  halt();
 	  break;
 
-  case SYS_EXIT:
+  case SYS_EXIT: //1
 	  set_arg(f->esp, argv, 1);
 	  exit((int)*(uint32_t*)argv[0]);
 	  break;
 
-  case SYS_EXEC:
+  case SYS_EXEC: //2
 	  set_arg(f->esp, argv, 1);
 	  check_valid_string((const char*) * (uint32_t*)argv[0], f->esp);
 	  f->eax = exec((const char*) * (uint32_t*)argv[0]);
 	  break;
 
-  case SYS_WAIT:
+  case SYS_WAIT: //3
 	  set_arg(f->esp, argv, 1);
 	  f->eax = wait((pid_t) * (uint32_t*)argv[0]);
 	  break;
 
-  case SYS_CREATE:
+  case SYS_CREATE: //4
 	  set_arg(f->esp, argv, 2);
 	  check_valid_string((const char*) * (uint32_t*)argv[0], f->esp);
 	  f->eax = create((const char*) * (uint32_t*)argv[0], 
                     (unsigned) * (uint32_t*)argv[1]);
 	  break;
 
-  case SYS_REMOVE:
+  case SYS_REMOVE: //5
 	  set_arg(f->esp, argv, 1);
 	  check_valid_string((const char*) * (uint32_t*)argv[0], f->esp);
 	  f->eax = remove((const char*) * (uint32_t*)argv[0]);
 	  break;
 
-  case SYS_OPEN:
+  case SYS_OPEN: //6
 	  set_arg(f->esp, argv, 1);
 	  check_valid_string((const char*) * (uint32_t*)argv[0], f->esp);
 	  f->eax = open((const char*) * (uint32_t*)argv[0]);
 	  break;
 
-  case SYS_FILESIZE:
+  case SYS_FILESIZE: //7
 	  set_arg(f->esp, argv, 1);
 	  f->eax = filesize((int) * (uint32_t*)argv[0]);
 	  break;
 
-  case SYS_READ:
+  case SYS_READ: //8
 	  set_arg(f->esp, argv, 3);
 	  check_buffer_validity((void*) * (uint32_t*)argv[1], 
                           (unsigned) * (uint32_t*)argv[2], f->esp, true);
@@ -105,9 +104,10 @@ syscall_handler (struct intr_frame *f UNUSED)
                   (unsigned) * (uint32_t*)argv[2]);
 	  break;
 
-  case SYS_WRITE:
+  case SYS_WRITE: //9
 	  set_arg(f->esp, argv, 3);
-	  check_valid_string((const char*) * (uint32_t*)argv[1], f->esp);
+	  check_buffer_validity((void*) * (uint32_t*)argv[1], 
+                          (unsigned) * (uint32_t*)argv[2], f->esp, false);
 	  f->eax = write((int)* (uint32_t*)argv[0], 
                    (const void*)* (uint32_t*)argv[1], 
                    (unsigned)* (uint32_t*)argv[2]);
@@ -130,7 +130,6 @@ syscall_handler (struct intr_frame *f UNUSED)
 
   case SYS_MMAP:
     set_arg(f->esp, argv, 2);
-    check_add_valid((void*) * (uint32_t*)argv[1]);
 	  f->eax = mmap((int) * (uint32_t*)argv[0], (void*) * (uint32_t*)argv[1]);
 	  break;
   
@@ -162,7 +161,7 @@ set_arg(void* esp, uint32_t* argv, int argc)
 	{
 		//printf("%d roop\n", i);
 		//printf("esp address is %x\n", esp);
-		check_add_valid(esp);
+		check_add_valid(esp+3);
 		argv[i] = (uint32_t*) esp;
 		
 		//printf("esp point to %d\n", (int) * (uint32_t*)(esp));
@@ -181,6 +180,7 @@ static struct vm_entry*
 check_add_valid(void* addr)
 {
   struct vm_entry* vme; 
+  //printf("check_add_valid with %p", addr);
 
 	if ((uint32_t)addr < 0x8048000 || (uint32_t)addr >= 0xc0000000)
 	{
@@ -248,11 +248,13 @@ static void
 check_valid_string(const void* str, void* esp) 
 {
   struct vm_entry* vme;
+  const void* str_str = str;
 
-  while (*((char*)str) != NULL)
+  while (*((char*)str_str) != NULL)
   {
-	  vme = check_add_valid(str);
-	  str++;
+    //printf("checking valid string, %p\n", str_str);
+	  vme = check_add_valid(str_str);
+	  str_str++;
   }
  
 }
@@ -311,7 +313,7 @@ exit(int status)
 pid_t		//2
 exec(const char* cmd_line)
 {
-	//check_add_valid(cmd_line);
+	check_add_valid(cmd_line);
 
 	if (*cmd_line == NULL) exit(-1);
 	//return process_execute(cmd_line);
@@ -462,7 +464,6 @@ read(int fd, void* buffer, unsigned size)
 			lock_release(&filesys_lock);
 			return -1; 
 		}
-
 		int ans = file_read(f, buffer, size);
 		lock_release(&filesys_lock);
 
@@ -491,6 +492,8 @@ int			//9
 write(int fd, const void* buffer, unsigned size)
 {
 	//check_add_valid(buffer);
+  //printf("fd: %d, buffer: %p, size: %d", fd, buffer, size);
+
 	lock_acquire(&filesys_lock);
 
 	if (fd == 1)
@@ -505,7 +508,6 @@ write(int fd, const void* buffer, unsigned size)
 			lock_release(&filesys_lock);
 			return -1; 
 		}
-
 		int ans = file_write(f, buffer, size);
 		
 		lock_release(&filesys_lock);
@@ -584,11 +586,13 @@ mmap(int fd, void* addr)
   //mmap fails if file size is 0, @param addr is not page aligned,
   //address is already in use, or addr is STDIN / STDOUT
   file_length = filesize(fd);
+	if ((uint32_t)addr < 0x8048000 || (uint32_t)addr >= 0xc0000000)
+    return -1;
   if (file_length== 0)
     return -1;
   if (find_vme(addr) != NULL)
     return -1;
-  if ((unsigned int)addr % PGSIZE != 0)
+  if (((unsigned int)addr % PGSIZE) != 0)
     return -1;
   if (fd == 0 || fd == 1) 
     return -1;

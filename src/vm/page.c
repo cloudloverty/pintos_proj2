@@ -1,3 +1,5 @@
+
+
 #include "vm/page.h"
 #include "userprog/process.h"
 
@@ -8,8 +10,13 @@ static bool vm_hash_less_func (const struct hash_elem* a,
 static struct list_elem* find_clock_victim();
 
 struct list frame_table;
+
 struct lock frame_table_access_lock;
+struct lock swap_space_lock;
+
 struct list_elem* clock_victim;
+
+struct bitmap* swap_sapce;
 
 /**
  * @param vm Hash table to initializae 
@@ -197,6 +204,18 @@ init_frame_table(void)
 {
   list_init(&frame_table);
   lock_init(&frame_table_access_lock);
+}
+
+/** 
+ * Initializes the swap space bit map and the swap_space_lock
+ * 
+ * @param size_of_swap_space The size to initialize the swap space.
+ */ 
+void 
+init_swap_space(size_t size_of_swap_space)
+{
+  swap_sapce = bitmap_create(size_of_swap_space);
+  lock_init(&swap_space_lock); 
 }
 
 /**

@@ -311,6 +311,9 @@ process_exit (void)
   struct list_elem* next_e; 
   mmap_id = 0;
 
+  bool vme_is_loaded ;
+  bool dirty_bit;
+
   for (; mmap_id < cur->mmap_id_max; mmap_id++)
     {
       mmap_file = get_mmap_file (mmap_id);
@@ -322,6 +325,12 @@ process_exit (void)
             e = next_e) 
           {
             next_e = list_next(e);
+            vme = list_entry(e, struct vm_entry, mmap_elem);
+            vme_is_loaded = vme->is_loaded_to_memory;
+            dirty_bit = pagedir_is_dirty(thread_current()->pagedir, vme->va);
+            if (vme_is_loaded && dirty_bit) 
+              file_write_at (vme->file, vme->va, vme->read_bytes, vme->offset);          
+            vme->is_loaded_to_memory = false;
             vme = list_entry(e, struct vm_entry, mmap_elem);
             list_remove(e);
             delete_vme(&thread_current()->vm, vme);

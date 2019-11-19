@@ -3,6 +3,7 @@
 
 #include <hash.h>
 #include <debug.h>
+#include <bitmap.h>
 #include <stdint.h>
 #include "filesys/file.h"
 #include "threads/malloc.h"
@@ -65,7 +66,7 @@ struct page* allocate_page (enum palloc_flags flags);
 struct page* find_page_from_frame_table(void* addr);
 void remove_page_from_table (struct page* page);
 
-void vm_swap_init();
+void init_swap_space(size_t size_of_swap_space);
 void vm_swap_in();
 void vm_swap_out();
 

@@ -323,7 +323,7 @@ process_exit (void)
           {
             next_e = list_next(e);
             vme = list_entry(e, struct vm_entry, mmap_elem);
-            e = list_remove(e);
+            list_remove(e);
             delete_vme(&thread_current()->vm, vme);
           }
         list_remove(&mmap_file->elem);
@@ -829,4 +829,11 @@ page_fault_handler (struct vm_entry* vme)
       break;
   }
   return res;
+}
+
+bool
+grow_stack(void* addr)
+{
+
+
 }

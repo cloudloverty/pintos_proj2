@@ -236,10 +236,10 @@ allocate_page (enum palloc_flags flags)
 
   new_page_struct->page_thread = thread_current();
   
-  while (new_page == NULL) {
-    reap_lru();
-    new_page = palloc_get_page(flags);
-  }
+  //while (new_page == NULL) {
+  //  reap_lru();
+  //  new_page = palloc_get_page(flags);
+  //}
 
   new_page_struct->physical_addr = new_page; 
 
@@ -261,6 +261,11 @@ free_physical_page_frame(void* addr)
 
   lock_acquire(&frame_table_access_lock);
   page = find_page_from_frame_table(addr);
+  if (page == NULL) 
+  {
+	  lock_release(&frame_table_access_lock);
+	  return;
+  }
   list_remove(&page->lru);
   pagedir_clear_page (page->page_thread->pagedir, page->vme->va);
   palloc_free_page(page->physical_addr);
@@ -328,7 +333,7 @@ vm_swap_in (void* addr, size_t index)
   int i;  
   size_t swap_index;
   struct block* block;
-
+  
   block = block_get_role(BLOCK_SWAP);
 
 }
@@ -390,7 +395,8 @@ reap_lru(void)
   struct page* page;
   bool dirty_bit;
 
-  page = evict_clock_victim();
+  //page = evict_clock_victim();
+  page = list_entry(list_pop_front(&frame_table), struct page*, lru);
   dirty_bit = pagedir_is_dirty(page->page_thread->pagedir, page->vme->va);
   
   switch(page->vme->file_type) {

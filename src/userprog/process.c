@@ -180,11 +180,13 @@ start_process (void *file_name_)
 
   ///////////// Set up Stack /////////////
   esp = &if_.esp;
-  for (int j = argc - 1; j >= 0; j--)		// push arguments to stack
+  int j ;
+  for (j = argc - 1; j >= 0; j--)		// push arguments to stack
   {
 	  //*esp -= (strlen(argv[j]) + 1);
 	  //strlcpy(esp, argv[j], strlen(argv[j]) + 1);
-	  for (int r = strlen(argv[j]); r >= 0 ; r--) {
+    int r;
+	  for (r = strlen(argv[j]); r >= 0 ; r--) {
 		  //printf("arg len: %d\n", strlen(argv[j]));
 		  *esp -= 1;
 		  **(char**)esp = argv[j][r];
@@ -198,8 +200,8 @@ start_process (void *file_name_)
 	  word_align = 0;
   else
 	  word_align = 4 - (len % 4);
-
-  for (int a = word_align; a > 0 ; a--)
+  int a ;
+  for (a= word_align; a > 0 ; a--)
   {
 	  *esp -= 1;
 	  **(uint8_t * *)esp = 0;					// align 4byte
@@ -208,8 +210,8 @@ start_process (void *file_name_)
 
   *esp -= 4;								
   **(uint32_t * *)esp = 0;					// argv[argc+1] with NULL
-
-  for (int k = argc - 1; k >= 0; k--)		// push argv[]
+  int k;
+  for (k = argc - 1; k >= 0; k--)		// push argv[]
   {
 	  *esp -= 4;
 	  **(uint32_t * *)esp = argv[k];
@@ -285,7 +287,8 @@ process_exit (void)
 //	  }
 //	  cur->fd_max = cur->fd_max - 1;
 //  }
-  for (int i = 0; i < 128; i++) {
+  int i;
+  for (i = 0; i < 128; i++) {
 	  if (cur->fd_table[i] != NULL) {
 		  close(i);
 	  }

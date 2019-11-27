@@ -156,9 +156,9 @@ set_arg(void* esp, uint32_t* argv, int argc)
 	//printf("esp point to %d\n", (int) * (uint32_t*)(esp));
 	//printf("esp address is %x\n", esp);
 	check_add_valid_simple(esp);
-
+  int i;
 	esp += 4;							// skip syscall number
-	for (int i = 0; i < argc; i++)
+	for (i = 0; i < argc; i++)
 	{
 		//printf("%d roop\n", i);
 		//printf("esp address is %x\n", esp);
@@ -194,7 +194,8 @@ check_add_valid(void* addr, void* esp)
   //if (!vme) {
 	 // return vme;
   //}
-  //else if (USER_STACK_GROW_LIMIT >= esp - addr) {	// valid address -> expand stack
+  //else if (USER_STACK_GROW_LIMIT >= esp - addr) {	
+    // valid address -> expand stack
 	 // if (!grow_stack(addr)) {
 		//  printf("stack grow fail\n");
 		//  exit(-1);
@@ -321,8 +322,8 @@ exit(int status)
 	struct thread* t = thread_current();
 	//printf("thread name is %s\n", t->name);
 	t->exit_status = status;
-
-	for (int i = 3; i < 128; i++) {
+  int i;
+	for ( i = 3; i < 128; i++) {
 		if (t->fd_table[i] != NULL) {
 			close(i);
 		}

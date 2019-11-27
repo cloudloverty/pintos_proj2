@@ -335,6 +335,12 @@ vm_swap_in (void* addr, size_t index)
   struct block* block;
   
   block = block_get_role(BLOCK_SWAP);
+  i = 0;
+
+  for (; i < 8; i++)
+    block_read (block, index + i, addr + 512 * i);
+
+  bitmap_set_multiple (swap_space, addr, 1, true);
 
 }
 
@@ -347,13 +353,27 @@ size_t
 vm_swap_out(void* addr) 
 {
   size_t i;
+  size_t swap_index;
+  struct block* block;
 
+  block = block_get_role(BLOCK_SWAP);
   i = 0;
+  swap_index = bitmap_scan (swap_space, 0, 1, true);
 
   for (; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
-
+    block_write(block, swap_index * 8 + i, addr + 512 * i);
   }
 
+  bitmap_set(swap_space, swap_index, false);
+
+  return swap_index + 1;
+
+}
+
+void
+vm_swap_clear (size_t swap_index)
+{
+  bitmap_set(swap_space, swap_index, true);
 }
 
 /**

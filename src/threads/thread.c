@@ -493,8 +493,8 @@ init_thread (struct thread *t, const char *name, int priority)
   sema_init(&t->sema_load, 0);
   sema_init(&t->sema_exit, 0);
   sema_init(&t->sema_sync, 0);
-
-  for (int i = 0; i < 128; i++)
+  int i = 0;
+  for (; i < 128; i++)
 	  t->fd_table[i] = NULL;
   t->fd_max = 3;
   t->mmap_id_max = 0;

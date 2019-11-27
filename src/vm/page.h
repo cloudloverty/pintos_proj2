@@ -73,4 +73,6 @@ void vm_swap_in(void* addr, size_t index);
 size_t vm_swap_out(void* addr);
 void* evict_clock_victim();
 
+void evict_victim(void);
+
 #endif

@@ -232,15 +232,13 @@ allocate_page (enum palloc_flags flags)
   struct page* new_page_struct;
 
   new_page = palloc_get_page(flags);
+  while (new_page == NULL) {
+	  evict_victim();
+	  new_page = palloc_get_page(flags);
+  }
+
   new_page_struct = (struct page*) malloc (sizeof (struct page));
-
   new_page_struct->page_thread = thread_current();
-  
-  //while (new_page == NULL) {
-  //  reap_lru();
-  //  new_page = palloc_get_page(flags);
-  //}
-
   new_page_struct->physical_addr = new_page; 
 
   push_page_to_table(new_page_struct);
@@ -358,15 +356,13 @@ vm_swap_out(void* addr)
 
   block = block_get_role(BLOCK_SWAP);
   i = 0;
-  swap_index = bitmap_scan (swap_space, 0, 1, true);
+  swap_index = bitmap_scan_and_flip (swap_space, 0, 1, true);
 
   for (; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
-    block_write(block, swap_index * 8 + i, addr + 512 * i);
+    block_write(block, swap_index + i, addr + 512 * i);
   }
 
-  bitmap_set(swap_space, swap_index, false);
-
-  return swap_index + 1;
+  return swap_index;
 
 }
 
@@ -410,33 +406,44 @@ evict_clock_victim(void)
  * Reap LRU entries such that palloc_get_page works
  */ 
 void 
-reap_lru(void)
+evict_victim(void)
 {
   struct page* page;
   bool dirty_bit;
 
   //page = evict_clock_victim();
-  page = list_entry(list_pop_front(&frame_table), struct page*, lru);
+  page = list_entry(list_pop_front(&frame_table), struct page, lru);
   dirty_bit = pagedir_is_dirty(page->page_thread->pagedir, page->vme->va);
-  
-  switch(page->vme->file_type) {
-    case VM_BIN:
-      if (dirty_bit) {
-        page->vme->swap_slot = vm_swap_out(page->physical_addr);
-        page->vme->file_type = VM_SWAP;
-      }
-      break;  
-    case VM_FILE:
-      if (dirty_bit) {
-        file_write_at (page->vme->file, page->vme->va, page->vme->read_bytes,
-                       page->vme->offset);
-      }
-      break;
-    case VM_SWAP:
-      if (dirty_bit) 
-        page->vme->swap_slot = vm_swap_out(page->physical_addr);
-      break;
+
+  if (dirty_bit) {
+	  //sync 걸어줘야 할 수도
+	  file_write_at(page->vme->file,	//file
+		  page->vme->va,				//buffer
+		  page->vme->read_bytes,		//size
+		  page->vme->offset);			//offset
   }
+
+  page->vme->swap_slot = vm_swap_out(page->physical_addr);
+  page->vme->file_type = VM_SWAP;
+  
+  //switch(page->vme->file_type) {
+  //  case VM_BIN:
+  //    if (dirty_bit) {
+  //      page->vme->swap_slot = vm_swap_out(page->physical_addr);
+  //      page->vme->file_type = VM_SWAP;
+  //    }
+  //    break;  
+  //  case VM_FILE:
+  //    if (dirty_bit) {
+  //      file_write_at (page->vme->file, page->vme->va, page->vme->read_bytes,
+  //                     page->vme->offset);
+  //    }
+  //    break;
+  //  case VM_SWAP:
+  //    if (dirty_bit) 
+  //      page->vme->swap_slot = vm_swap_out(page->physical_addr);
+  //    break;
+  //}
 
   pagedir_clear_page (page->page_thread->pagedir, page->vme->va);
   page->vme->is_loaded_to_memory = false;

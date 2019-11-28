@@ -347,11 +347,11 @@ exit(int status)
 pid_t		//2
 exec(const char* cmd_line)
 {
-	//check_add_valid(cmd_line);
-	check_add_valid_simple(cmd_line);
+  //printf("cmd_line of exec, %s\n", cmd_line);
+	//check_add_valid_simple(cmd_line);
 
 
-	if (*cmd_line == NULL) exit(-1);
+	//if (*cmd_line == NULL) exit(-1);
 	//return process_execute(cmd_line);
 	//printf("exec. process_execute\n");
 	tid_t cpid = process_execute(cmd_line);

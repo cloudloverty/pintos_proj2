@@ -245,7 +245,8 @@ allocate_page (enum palloc_flags flags)
 
   new_page = palloc_get_page(flags);
   while (new_page == NULL) {
-	  evict_victim();
+    //printf("eviciting!\n");
+    evict_victim();
 	  new_page = palloc_get_page(flags);
   }
 
@@ -373,7 +374,7 @@ init_swap_space(size_t size_of_swap_space)
 void 
 swap_in (void* addr, size_t index)
 {
-  //printf("swapping in %p from %d...\n", addr, index);
+  //printf("swapping in %p from %d:\n", addr, index);
   size_t i;  
   struct block* block;
   
@@ -383,7 +384,7 @@ swap_in (void* addr, size_t index)
   for (; i < 8; i++)
     block_read (block, index * 8 + i, addr + 512 * i);
 
-  bitmap_set (swap_space, index, false);
+  bitmap_set (swap_space, index, true);
 }
 
 /**
@@ -394,7 +395,6 @@ swap_in (void* addr, size_t index)
 size_t 
 swap_out(void* addr) 
 {
-  //printf("swapping out %p... \n", addr);
   size_t i;
   size_t swap_index;
   struct block* block;
@@ -408,6 +408,7 @@ swap_out(void* addr)
     //swap_index * 8 is done as that is one page. 
     block_write(block, swap_index * 8 + i, addr + 512 * i);
   }
+    //printf("swapping out %p to %d: \n", addr, swap_index);
 
   return swap_index;
 
@@ -425,7 +426,7 @@ swap_clear (size_t swap_index)
 
 
 /** 
- * Reap LRU entries such that palloc_get_page works
+ * Reap  entries such that palloc_get_page works
  */ 
 void 
 evict_victim(void)
@@ -439,6 +440,8 @@ evict_victim(void)
   dirty_bit = pagedir_is_dirty(victim_page->page_thread->pagedir,
                                victim_page->vme->va);
   victim_file_type = victim_page->vme->file_type;
+  victim_page->vme->is_loaded_to_memory = false;
+
 
   if (dirty_bit) {
     if (victim_file_type == VM_BIN) {
@@ -450,35 +453,11 @@ evict_victim(void)
 		  victim_page->vme->va,				//buffer
 		  victim_page->vme->read_bytes,		//size
 		  victim_page->vme->offset);			//offset
-    } else if (victim_file_type == VM_SWAP) {
-      victim_page->vme->swap_slot = swap_out (victim_page->physical_addr);
-    }
-
-    victim_page->vme->is_loaded_to_memory = false;
-	  
+    } 
   }
-
-  //page->vme->swap_slot = vm_swap_out(page->physical_addr);
-  //page->vme->file_type = VM_SWAP;
-  
-  //switch(page->vme->file_type) {
-  //  case VM_BIN:
-  //    if (dirty_bit) {
-  //      page->vme->swap_slot = vm_swap_out(page->physical_addr);
-  //      page->vme->file_type = VM_SWAP;
-  //    }
-  //    break;  
-  //  case VM_FILE:
-  //    if (dirty_bit) {
-  //      file_write_at (page->vme->file, page->vme->va, page->vme->read_bytes,
-  //                     page->vme->offset);
-  //    }
-  //    break;
-  //  case VM_SWAP:
-  //    if (dirty_bit) 
-  //      page->vme->swap_slot = vm_swap_out(page->physical_addr);
-  //    break;
-  //}
+  if (victim_file_type == VM_SWAP) {
+      victim_page->vme->swap_slot = swap_out (victim_page->physical_addr);
+  }
 
   pagedir_clear_page (victim_page->page_thread->pagedir, victim_page->vme->va);
   remove_page_from_table(victim_page);

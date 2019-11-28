@@ -492,14 +492,15 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   lock_acquire(&load_lock);
   /* Open executable file. */
-  file = filesys_open (file_name);
-  if (file == NULL) 
-    {
-	  lock_release(&load_lock);
-      //printf ("load: %s: open failed\n", file_name);
-      goto done; 
-    }
-
+  if (true){ 
+    file = filesys_open (file_name);
+    if (file == NULL) 
+      {
+      lock_release(&load_lock);
+        //printf ("load: %s: open failed\n", file_name);
+        goto done; 
+      }
+  }
   t->running_file = file;
   file_deny_write(file);
   lock_release(&load_lock);

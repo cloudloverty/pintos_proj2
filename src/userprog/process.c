@@ -72,14 +72,14 @@ process_execute (const char *file_name)
   temp[strlen(file_name)] = '\0';
   cmd_name = strtok_r(temp, " ", &save_ptr);
 
-  if (filesys_open(cmd_name) == NULL) {
+/*   if (filesys_open(cmd_name) == NULL) {
 	  return -1;
   }
-
+ */
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, fn_copy);
 
-  sema_down(&thread_current()->sema_sync);
+  //sema_down(&thread_current()->sema_sync);
 
   if (tid == TID_ERROR) {
     palloc_free_page (fn_copy); 
@@ -167,7 +167,7 @@ start_process (void *file_name_)
 	  thread_current()->load_success = false;
 
 	  sema_up(&thread_current()->sema_load);
-	  sema_up(&thread_current()->parent->sema_sync);
+	  //sema_up(&thread_current()->parent->sema_sync);
 	  //free(argv);
 	  thread_exit();
 	  //exit(-1);
@@ -375,7 +375,7 @@ process_exit (void)
 
   if (cur->parent == NULL) {
 	  //printf("No parent. Free resources\n");
-	  palloc_free_page(cur);
+	  //palloc_free_page(cur);
   }
   //palloc_free_page(cur);
   //printf("exiting\n");

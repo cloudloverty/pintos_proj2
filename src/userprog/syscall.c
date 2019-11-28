@@ -362,7 +362,6 @@ exec(const char* cmd_line)
 	//printf("exec. sema_down for sema_load\n");
 	sema_down(&c->sema_load);
 
-
 	if (!c->load_success)
 	{
 		remove_child_process(c);

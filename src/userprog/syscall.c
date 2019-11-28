@@ -282,13 +282,12 @@ check_buffer_validity(void* buffer, unsigned size,
 static void 
 check_valid_string(const void* str, void* esp) 
 {
-  struct vm_entry* vme;
   const void* str_str = str;
 
   while (*((char*)str_str) != NULL)
   {
     //printf("checking valid string, %p\n", str_str);
-	  vme = check_add_valid(str_str, esp);
+	  check_add_valid(str_str, esp);
 	  str_str++;
   }
  

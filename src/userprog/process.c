@@ -293,8 +293,9 @@ process_exit (void)
 		  close(i);
 	  }
   }
-
   file_close(cur->running_file);
+  //printf("file closed\n");
+
   cur->running_file = NULL;
 
   ////////////////////+++++++++++++++++++///////////////////////////////
@@ -343,12 +344,14 @@ process_exit (void)
       }
     }
   //////////////////////////////////////////////////////////////////////
-
+  //printf("mmap closed\n");
 
   //////////////////////////////////////////P3
   /* Delete hash table and vm_entries using destroy_vm()*/
   destroy_vm(&thread_current()->vm);
   //////////////////////////////////////////P3
+  printf("destroying vm complete\n");
+
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -372,6 +375,8 @@ process_exit (void)
 	  palloc_free_page(cur);
   }
   //palloc_free_page(cur);
+  printf("exiting\n");
+
 }
 
 /* Sets up the CPU for running user code in the current
@@ -695,7 +700,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp) 
 {
-  uint8_t *kpage;
+  struct page *kpage;
   uint8_t *upage;
   bool success = false;
   struct vm_entry* vme;
@@ -706,13 +711,14 @@ setup_stack (void **esp)
 	  return false;
   }
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = allocate_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
 	  //printf("phys base: %x\n", PHYS_BASE);
 	  //printf("pgsize: %u\n", PGSIZE);
+      //push_page_to_table(kpage);
       upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
-      success = install_page (upage, kpage, true);
+      success = install_page (upage, kpage->physical_addr, true);
       if (success) 
 	  {
 		  *esp = PHYS_BASE;
@@ -723,20 +729,22 @@ setup_stack (void **esp)
 
 		  //set members of the vm_entry 
 		  //TODO: va, write_permission, is_loaded_to_memory unclear
-		  vme->file_type = VM_SWAP;
-		  vme->va = upage;                
-		  vme->write_permission = true;    
-		  vme->is_loaded_to_memory = true;
+      kpage->vme = (struct vme* ) malloc (sizeof(struct vm_entry));
+      kpage->vme->file_type = VM_SWAP;
+		  kpage->vme->va = upage;                
+		  kpage->vme->write_permission = true;    
+		  kpage->vme->is_loaded_to_memory = true;
 
 		  //insert created vm_entry into vm hash table of thread 
-		  insert_vme(&thread_current()->vm, vme);
+		  insert_vme(&thread_current()->vm, kpage->vme);
 		  //printf("setup_stack vme insterted: %x\n", upage);
 		  ////////// Added in P3 end /////////
 
 	  } 
 	  else 
 	  {
-		  palloc_free_page(kpage);
+		  free_physical_page_frame(kpage);
+      free(vme);
 		  return false;
 	  }
 
@@ -811,30 +819,36 @@ remove_child_process(struct thread* c)
 bool 
 page_fault_handler (struct vm_entry* vme) 
 {
-  uint8_t* kaddr; //address of physical page 
+  struct page* kaddr; //address of physical page 
   bool res;  
   //printf("page_fault_handler!!\n");
-  kaddr = palloc_get_page(PAL_USER);
+  kaddr = allocate_page (PAL_USER);
+  kaddr->vme = vme;
   if (kaddr == NULL) {
     return false;
   }
   
-  switch(vme->file_type) {
+  switch(kaddr->vme->file_type) {
     case VM_BIN:  
     case VM_FILE:
-      if (!load_file(kaddr, vme)) {
-        palloc_free_page(kaddr);
+      if (!load_file(kaddr->physical_addr, vme)) {
+        free_physical_page_frame(kaddr->physical_addr);
         return false;
       }
 	     //printf("page_fault_handler: %u\n", vme->va);
-      res = install_page(vme->va, kaddr, vme->write_permission);
+      res = install_page(vme->va, kaddr->physical_addr, vme->write_permission);
       if (!res) {
 		    return false;
       }
       vme->is_loaded_to_memory = true;
+      push_page_to_table(kaddr);
       break;
     case VM_SWAP:
-
+       swap_in (vme->swap_slot, kaddr->physical_addr);
+       install_page (vme->va, kaddr->physical_addr, vme->write_permission);
+       vme->is_loaded_to_memory = true;
+       push_page_to_table(kaddr);
+       res = true;
       break;
     default:
       ASSERT(false); // should never reach 
@@ -851,8 +865,11 @@ page_fault_handler (struct vm_entry* vme)
 bool
 grow_stack(void* addr)
 {
+  void* page_addr;
+  struct page* kpage;
+
 	/* No heuristic check here, check heuristic validity before using this function */
-	void* page_addr = pg_round_down(addr);
+  page_addr = pg_round_down(addr);
 
 	/* stack should be smaller than 8MB */
 	if (page_addr < USER_STACK_BOTTOM) {
@@ -860,23 +877,23 @@ grow_stack(void* addr)
 	}
 
 	//kpage = alloc page()
-	uint8_t* kpage = palloc_get_page (PAL_USER);
+	 kpage = allocate_page (PAL_USER);
 
 
 	/* creat and init vm_entry of page */
-	struct vm_entry* vme = (struct vm_entry*) malloc(sizeof(struct vm_entry));
-	if (vme == NULL) {
+	kpage->vme = (struct vm_entry*) malloc(sizeof(struct vm_entry));
+	if (kpage->vme == NULL) {
 		return false;
 	}
 
-	vme->file_type = VM_SWAP;
-	vme->write_permission = true;
-	vme->is_loaded_to_memory = true;
-	vme->va = page_addr;
+	kpage->vme->file_type = VM_SWAP;
+	kpage->vme->write_permission = true;
+	kpage->vme->is_loaded_to_memory = true;
+	kpage->vme->va = page_addr;
 
-	insert_vme(&thread_current()->vm, vme);
+	insert_vme(&thread_current()->vm, kpage->vme);
 
-	if (!install_page(page_addr, kpage, true)) {
+	if (!install_page(page_addr, kpage->physical_addr, true)) {
 		return false;
 	}
 

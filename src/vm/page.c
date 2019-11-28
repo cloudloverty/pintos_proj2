@@ -111,7 +111,9 @@ delete_vme(struct hash* vm, struct vm_entry* vme)
   struct hash_elem * res; //stores return value of hash_delete() 
   
   res = hash_delete(vm, &(vme->elem));
-  
+  free_physical_page_frame(vme->va);  
+  swap_clear (vme->swap_slot);
+  free(vme);  
   return (res != NULL);
 }
 
@@ -151,6 +153,7 @@ find_vme(void* va)
 void 
 destroy_vm(struct hash* vm) 
 {
+  //printf("in destroy_vm\n");
   hash_destroy(vm, hash_destroy_action_func);
 }
 
@@ -163,10 +166,19 @@ destroy_vm(struct hash* vm)
 void 
 hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED) 
 {
+  printf("in hash_destroy_action_func\n");
+
   struct vm_entry* vme; //struct that hash_elem e is in 
   void* start_of_page; 
   
   vme = (struct vm_entry*) hash_entry(e, struct vm_entry, elem);
+  
+  free_physical_page_frame(vme->va);  
+  printf("free_physical_page_frame complete\n");
+
+  swap_clear(vme->swap_slot);
+  printf("swap clear complete\n");
+
   free (hash_entry (e, struct vm_entry, elem));
   ///*if page is loaded to memory, free page and change page in PDE */
   //if (vme->is_loaded_to_memory == true) { 
@@ -207,19 +219,6 @@ init_frame_table(void)
   lock_init(&frame_table_access_lock);
 }
 
-/** 
- * Initializes the swap space bit map and the swap_space_lock
- * 
- * @param size_of_swap_space The size to initialize the swap space.
- */ 
-void 
-init_swap_space(size_t size_of_swap_space)
-{
-  swap_space = bitmap_create(size_of_swap_space);
-  bitmap_set_all(swap_space, true);
-  lock_init(&swap_space_lock); 
-}
-
 /**
  * @param flags Flags used for palloc
  * 
@@ -256,9 +255,15 @@ void
 free_physical_page_frame(void* addr) 
 {
   struct page* page;
+  void* real_addr;
 
   lock_acquire(&frame_table_access_lock);
-  page = find_page_from_frame_table(addr);
+  printf("in free_physical_page_frame\n");
+  real_addr = pagedir_get_page (thread_current ()->pagedir, addr);
+  printf("getting phys_addr\n");
+  page = find_page_from_frame_table(real_addr);
+  printf("finding page success\n");
+
   if (page == NULL) 
   {
 	  lock_release(&frame_table_access_lock);
@@ -307,6 +312,7 @@ remove_page_from_table (struct page* page)
 struct page*
 find_page_from_frame_table(void* addr) 
 {
+  
   struct list_elem* e;
   struct page* page;
 
@@ -319,6 +325,21 @@ find_page_from_frame_table(void* addr)
   return NULL; 
 } 
 
+/** 
+ * Initializes the swap space bit map and the swap_space_lock
+ * 
+ * @param size_of_swap_space The size to initialize the swap space.
+ */ 
+void 
+init_swap_space(size_t size_of_swap_space)
+{
+  //size of swap space is size of swap block divided by sectors per page 
+  swap_space = bitmap_create(size_of_swap_space);
+  bitmap_set_all(swap_space, true);
+  lock_init(&swap_space_lock); 
+}
+
+
 /**
  * @param addr  Address to swap in 
  * @param index Index in swap space to swap in.
@@ -326,19 +347,18 @@ find_page_from_frame_table(void* addr)
  * Swap in contents in @param addr to @param index of swap space. 
  */ 
 void 
-vm_swap_in (void* addr, size_t index)
+swap_in (void* addr, size_t index)
 {
-  int i;  
-  size_t swap_index;
+  size_t i;  
   struct block* block;
   
   block = block_get_role(BLOCK_SWAP);
   i = 0;
 
   for (; i < 8; i++)
-    block_read (block, index + i, addr + 512 * i);
+    block_read (block, index * 8 + i, addr + 512 * i);
 
-  bitmap_set_multiple (swap_space, addr, 1, true);
+  bitmap_set (swap_space, index, false);
 
 }
 
@@ -348,7 +368,7 @@ vm_swap_in (void* addr, size_t index)
  * Swap contents out from @param addr to swap space. 
  */ 
 size_t 
-vm_swap_out(void* addr) 
+swap_out(void* addr) 
 {
   size_t i;
   size_t swap_index;
@@ -359,17 +379,86 @@ vm_swap_out(void* addr)
   swap_index = bitmap_scan_and_flip (swap_space, 0, 1, true);
 
   for (; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
-    block_write(block, swap_index + i, addr + 512 * i);
+    //swap index is the index of free blocks. 
+    //swap_index * 8 is done as that is one page. 
+    block_write(block, swap_index * 8 + i, addr + 512 * i);
   }
 
   return swap_index;
 
 }
 
+/**
+ * Clear the Swap Index  
+ */ 
 void
-vm_swap_clear (size_t swap_index)
+swap_clear (size_t swap_index)
 {
   bitmap_set(swap_space, swap_index, true);
+}
+
+
+/** 
+ * Reap LRU entries such that palloc_get_page works
+ */ 
+void 
+evict_victim(void)
+{
+  struct page* victim_page;
+  bool dirty_bit;
+  uint8_t victim_file_type;
+
+  //page = evict_clock_victim();
+  victim_page = list_entry(list_pop_front(&frame_table), struct page, lru);
+  dirty_bit = pagedir_is_dirty(victim_page->page_thread->pagedir,
+                               victim_page->vme->va);
+  victim_file_type = victim_page->vme->file_type;
+
+  if (dirty_bit) {
+    if (victim_file_type == VM_BIN) {
+      victim_page->vme->swap_slot = swap_out (victim_page->physical_addr);
+      victim_page->vme->file_type = VM_SWAP;
+    } else if (victim_file_type == VM_FILE) {
+      //sync 걸어줘야 할 수도
+	    file_write_at(victim_page->vme->file,	//file
+		  victim_page->vme->va,				//buffer
+		  victim_page->vme->read_bytes,		//size
+		  victim_page->vme->offset);			//offset
+    } else if (victim_file_type == VM_SWAP) {
+      victim_page->vme->swap_slot = swap_out (victim_page->physical_addr);
+    }
+
+    victim_page->vme->is_loaded_to_memory = false;
+	  
+  }
+
+  //page->vme->swap_slot = vm_swap_out(page->physical_addr);
+  //page->vme->file_type = VM_SWAP;
+  
+  //switch(page->vme->file_type) {
+  //  case VM_BIN:
+  //    if (dirty_bit) {
+  //      page->vme->swap_slot = vm_swap_out(page->physical_addr);
+  //      page->vme->file_type = VM_SWAP;
+  //    }
+  //    break;  
+  //  case VM_FILE:
+  //    if (dirty_bit) {
+  //      file_write_at (page->vme->file, page->vme->va, page->vme->read_bytes,
+  //                     page->vme->offset);
+  //    }
+  //    break;
+  //  case VM_SWAP:
+  //    if (dirty_bit) 
+  //      page->vme->swap_slot = vm_swap_out(page->physical_addr);
+  //    break;
+  //}
+
+  pagedir_clear_page (victim_page->page_thread->pagedir, victim_page->vme->va);
+  remove_page_from_table(victim_page);
+  palloc_free_page (victim_page->physical_addr);
+  free (victim_page);
+
 }
 
 /**
@@ -400,56 +489,6 @@ evict_clock_victim(void)
   }
   list_remove(clock_victim);
   return page;  
-}
-
-/** 
- * Reap LRU entries such that palloc_get_page works
- */ 
-void 
-evict_victim(void)
-{
-  struct page* page;
-  bool dirty_bit;
-
-  //page = evict_clock_victim();
-  page = list_entry(list_pop_front(&frame_table), struct page, lru);
-  dirty_bit = pagedir_is_dirty(page->page_thread->pagedir, page->vme->va);
-
-  if (dirty_bit) {
-	  //sync 걸어줘야 할 수도
-	  file_write_at(page->vme->file,	//file
-		  page->vme->va,				//buffer
-		  page->vme->read_bytes,		//size
-		  page->vme->offset);			//offset
-  }
-
-  page->vme->swap_slot = vm_swap_out(page->physical_addr);
-  page->vme->file_type = VM_SWAP;
-  
-  //switch(page->vme->file_type) {
-  //  case VM_BIN:
-  //    if (dirty_bit) {
-  //      page->vme->swap_slot = vm_swap_out(page->physical_addr);
-  //      page->vme->file_type = VM_SWAP;
-  //    }
-  //    break;  
-  //  case VM_FILE:
-  //    if (dirty_bit) {
-  //      file_write_at (page->vme->file, page->vme->va, page->vme->read_bytes,
-  //                     page->vme->offset);
-  //    }
-  //    break;
-  //  case VM_SWAP:
-  //    if (dirty_bit) 
-  //      page->vme->swap_slot = vm_swap_out(page->physical_addr);
-  //    break;
-  //}
-
-  pagedir_clear_page (page->page_thread->pagedir, page->vme->va);
-  page->vme->is_loaded_to_memory = false;
-  palloc_free_page (page->physical_addr);
-  free (page);
-
 }
 
 /** 

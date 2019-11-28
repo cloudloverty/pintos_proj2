@@ -5,6 +5,7 @@
 #include <debug.h>
 #include <bitmap.h>
 #include <stdint.h>
+#include <stdio.h>
 #include "filesys/file.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
@@ -69,8 +70,9 @@ struct page* find_page_from_frame_table(void* addr);
 void remove_page_from_table (struct page* page);
 
 void init_swap_space(size_t size_of_swap_space);
-void vm_swap_in(void* addr, size_t index);
-size_t vm_swap_out(void* addr);
+void swap_in(void* addr, size_t index);
+size_t swap_out(void* addr);
+void swap_clear (size_t swap_index);
 void* evict_clock_victim();
 
 void evict_victim(void);

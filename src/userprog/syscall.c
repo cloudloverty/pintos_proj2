@@ -707,16 +707,18 @@ munmap(mapid_t mapid)
   e = list_begin(&mmap_file->vme_list);
 
   for (; e != list_end(&mmap_file->vme_list);
-       e = list_next(e)) 
+       ) 
     {
       vme = list_entry(e, struct vm_entry, mmap_elem);
       vme_is_loaded = vme->is_loaded_to_memory;
       dirty_bit = pagedir_is_dirty(thread_current()->pagedir, vme->va);
-      if (vme_is_loaded && dirty_bit) 
+      if (vme_is_loaded && dirty_bit) {
         file_write_at (vme->file, vme->va, vme->read_bytes, vme->offset);
+        free_physical_page_frame(vme->va);
+      }
             
       vme->is_loaded_to_memory = false;
-      list_remove(e);
+      e = list_remove(e);
       delete_vme(&thread_current()->vm, vme);
     }
   list_remove(&mmap_file->elem);

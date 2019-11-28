@@ -332,8 +332,10 @@ process_exit (void)
             vme = list_entry(e, struct vm_entry, mmap_elem);
             vme_is_loaded = vme->is_loaded_to_memory;
             dirty_bit = pagedir_is_dirty(thread_current()->pagedir, vme->va);
-            if (vme_is_loaded && dirty_bit) 
-              file_write_at (vme->file, vme->va, vme->read_bytes, vme->offset);          
+            if (vme_is_loaded && dirty_bit) {
+              file_write_at (vme->file, vme->va, vme->read_bytes, vme->offset);     
+              free_physical_page_frame(vme->va);
+            }
             vme->is_loaded_to_memory = false;
             vme = list_entry(e, struct vm_entry, mmap_elem);
             list_remove(e);
@@ -346,11 +348,12 @@ process_exit (void)
   //////////////////////////////////////////////////////////////////////
   //printf("mmap closed\n");
 
+  //printf("going into destroy vm\n");
   //////////////////////////////////////////P3
   /* Delete hash table and vm_entries using destroy_vm()*/
   destroy_vm(&thread_current()->vm);
   //////////////////////////////////////////P3
-  printf("destroying vm complete\n");
+  //printf("destroying vm complete\n");
 
 
   /* Destroy the current process's page directory and switch back
@@ -375,7 +378,7 @@ process_exit (void)
 	  palloc_free_page(cur);
   }
   //palloc_free_page(cur);
-  printf("exiting\n");
+  //printf("exiting\n");
 
 }
 
@@ -681,6 +684,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       vme->zero_bytes = page_zero_bytes;
       vme->is_loaded_to_memory = false;
       vme->va = upage; 
+      vme->swap_slot = 0;
 
       //Add vm_entry to hash table
       insert_vme(&thread_current()->vm, vme);
@@ -734,6 +738,7 @@ setup_stack (void **esp)
 		  kpage->vme->va = upage;                
 		  kpage->vme->write_permission = true;    
 		  kpage->vme->is_loaded_to_memory = true;
+      kpage->vme->swap_slot = 0;
 
 		  //insert created vm_entry into vm hash table of thread 
 		  insert_vme(&thread_current()->vm, kpage->vme);
@@ -823,10 +828,10 @@ page_fault_handler (struct vm_entry* vme)
   bool res;  
   //printf("page_fault_handler!!\n");
   kaddr = allocate_page (PAL_USER);
-  kaddr->vme = vme;
   if (kaddr == NULL) {
     return false;
   }
+  kaddr->vme = vme;
   
   switch(kaddr->vme->file_type) {
     case VM_BIN:  
@@ -835,20 +840,22 @@ page_fault_handler (struct vm_entry* vme)
         free_physical_page_frame(kaddr->physical_addr);
         return false;
       }
-	     //printf("page_fault_handler: %u\n", vme->va);
+      /* printf("installing up 0x%x to vp 0x%x\n", 
+              vme->va, kaddr->physical_addr); */
       res = install_page(vme->va, kaddr->physical_addr, vme->write_permission);
       if (!res) {
 		    return false;
       }
-      vme->is_loaded_to_memory = true;
+      kaddr->vme->is_loaded_to_memory = true;
       push_page_to_table(kaddr);
       break;
     case VM_SWAP:
        swap_in (vme->swap_slot, kaddr->physical_addr);
-       install_page (vme->va, kaddr->physical_addr, vme->write_permission);
-       vme->is_loaded_to_memory = true;
+       res = install_page (vme->va, kaddr->physical_addr,
+                           vme->write_permission);
+       kaddr->vme->is_loaded_to_memory = true;
        push_page_to_table(kaddr);
-       res = true;
+       
       break;
     default:
       ASSERT(false); // should never reach 
@@ -890,6 +897,7 @@ grow_stack(void* addr)
 	kpage->vme->write_permission = true;
 	kpage->vme->is_loaded_to_memory = true;
 	kpage->vme->va = page_addr;
+  kpage->vme->swap_slot = 0;
 
 	insert_vme(&thread_current()->vm, kpage->vme);
 

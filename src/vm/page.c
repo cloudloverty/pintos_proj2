@@ -154,7 +154,19 @@ void
 destroy_vm(struct hash* vm) 
 {
   //printf("in destroy_vm\n");
+  struct list_elem* e;
+  struct page* page;
+
+ /*  e = list_begin(&frame_table);
+  for (; e!= list_end(&frame_table); ) {
+    page = list_entry(e, struct page, lru);
+    printf("in frame table: addr 0x%x\n", page->physical_addr);
+    e = list_next(e);
+  } */
+  
   hash_destroy(vm, hash_destroy_action_func);
+  //printf("destroy_vm complete\n");
+
 }
 
 /** 
@@ -166,7 +178,7 @@ destroy_vm(struct hash* vm)
 void 
 hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED) 
 {
-  printf("in hash_destroy_action_func\n");
+  //printf("in hash_destroy_action_func\n");
 
   struct vm_entry* vme; //struct that hash_elem e is in 
   void* start_of_page; 
@@ -174,19 +186,19 @@ hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED)
   vme = (struct vm_entry*) hash_entry(e, struct vm_entry, elem);
   
   free_physical_page_frame(vme->va);  
-  printf("free_physical_page_frame complete\n");
+  //printf("free_physical_page_frame complete\n");
 
   swap_clear(vme->swap_slot);
-  printf("swap clear complete\n");
+  //printf("swap clear complete\n");
 
   free (hash_entry (e, struct vm_entry, elem));
   ///*if page is loaded to memory, free page and change page in PDE */
-  //if (vme->is_loaded_to_memory == true) { 
+ /*  //if (vme->is_loaded_to_memory == true) { 
   //  start_of_page = pg_round_down(vme->va);
   //  palloc_free_page(start_of_page);
   //  pagedir_clear_page(thread_current()->pagedir, start_of_page);
   //}
-  //free(vme);
+  //free(vme); */
 }
 
 /**
@@ -229,6 +241,7 @@ allocate_page (enum palloc_flags flags)
 {
   void* new_page;
   struct page* new_page_struct;
+  
 
   new_page = palloc_get_page(flags);
   while (new_page == NULL) {
@@ -239,8 +252,16 @@ allocate_page (enum palloc_flags flags)
   new_page_struct = (struct page*) malloc (sizeof (struct page));
   new_page_struct->page_thread = thread_current();
   new_page_struct->physical_addr = new_page; 
+  /* printf("allocated 0x%x\n", new_page);
 
-  push_page_to_table(new_page_struct);
+  struct list_elem* e;
+  struct page* page;
+  e = list_begin(&frame_table);
+  for (; e!= list_end(&frame_table); ) {
+    page = list_entry(e, struct page, lru);
+    printf("in frame table: addr 0x%x\n", page->physical_addr);
+    e = list_next(e);
+  } */
 
   return new_page_struct;
 } 
@@ -256,23 +277,25 @@ free_physical_page_frame(void* addr)
 {
   struct page* page;
   void* real_addr;
+  
 
   lock_acquire(&frame_table_access_lock);
-  printf("in free_physical_page_frame\n");
+  //printf("in free_physical_page_frame\n");
   real_addr = pagedir_get_page (thread_current ()->pagedir, addr);
-  printf("getting phys_addr\n");
+  //printf("freeing 0x%x\n", real_addr);
   page = find_page_from_frame_table(real_addr);
-  printf("finding page success\n");
+  //printf("finding page success\n");
 
   if (page == NULL) 
   {
 	  lock_release(&frame_table_access_lock);
 	  return;
   }
-  list_remove(&page->lru);
   pagedir_clear_page (page->page_thread->pagedir, page->vme->va);
+  //printf("clearing page success\n");
+  remove_page_from_table(page);
+  //printf("removing page success\n");
   palloc_free_page(page->physical_addr);
-
   free(page);
   lock_release(&frame_table_access_lock);
 }
@@ -298,9 +321,9 @@ push_page_to_table(struct page* page_frame)
 void 
 remove_page_from_table (struct page* page) 
 {
-  lock_acquire(&frame_table_access_lock);
+  //lock_acquire(&frame_table_access_lock);
   list_remove(&page->lru);
-  lock_release(&frame_table_access_lock);
+  //lock_release(&frame_table_access_lock);
 }
 
 /**
@@ -359,7 +382,6 @@ swap_in (void* addr, size_t index)
     block_read (block, index * 8 + i, addr + 512 * i);
 
   bitmap_set (swap_space, index, false);
-
 }
 
 /**
@@ -378,7 +400,7 @@ swap_out(void* addr)
   i = 0;
   swap_index = bitmap_scan_and_flip (swap_space, 0, 1, true);
 
-  for (; i < PGSIZE / BLOCK_SECTOR_SIZE; i++) {
+  for (; i < 8; i++) {
     //swap index is the index of free blocks. 
     //swap_index * 8 is done as that is one page. 
     block_write(block, swap_index * 8 + i, addr + 512 * i);
@@ -394,6 +416,7 @@ swap_out(void* addr)
 void
 swap_clear (size_t swap_index)
 {
+  //printf("swap index: 0x%x\n", swap_index);
   bitmap_set(swap_space, swap_index, true);
 }
 

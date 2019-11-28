@@ -850,7 +850,7 @@ page_fault_handler (struct vm_entry* vme)
       push_page_to_table(kaddr);
       break;
     case VM_SWAP:
-       swap_in (vme->swap_slot, kaddr->physical_addr);
+       swap_in (kaddr->physical_addr, vme->swap_slot);
        res = install_page (vme->va, kaddr->physical_addr,
                            vme->write_permission);
        kaddr->vme->is_loaded_to_memory = true;

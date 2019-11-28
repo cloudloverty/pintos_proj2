@@ -360,6 +360,7 @@ init_swap_space(size_t size_of_swap_space)
   swap_space = bitmap_create(size_of_swap_space);
   bitmap_set_all(swap_space, true);
   lock_init(&swap_space_lock); 
+  printf("swap init complete\n");
 }
 
 
@@ -372,6 +373,7 @@ init_swap_space(size_t size_of_swap_space)
 void 
 swap_in (void* addr, size_t index)
 {
+  //printf("swapping in %p from %d...\n", addr, index);
   size_t i;  
   struct block* block;
   
@@ -392,6 +394,7 @@ swap_in (void* addr, size_t index)
 size_t 
 swap_out(void* addr) 
 {
+  //printf("swapping out %p... \n", addr);
   size_t i;
   size_t swap_index;
   struct block* block;

@@ -72,10 +72,10 @@ process_execute (const char *file_name)
   temp[strlen(file_name)] = '\0';
   cmd_name = strtok_r(temp, " ", &save_ptr);
 
-/*   if (filesys_open(cmd_name) == NULL) {
+  if (filesys_open(cmd_name) == NULL) {
 	  return -1;
   }
- */
+
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (cmd_name, PRI_DEFAULT, start_process, fn_copy);
 

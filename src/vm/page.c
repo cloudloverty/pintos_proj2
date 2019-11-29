@@ -8,14 +8,11 @@ static unsigned vm_hash_func(const struct hash_elem* e, void* aux);
 static bool vm_hash_less_func (const struct hash_elem* a, 
                                const struct hash_elem* b,
                                void* AUX UNUSED);
-static struct list_elem* find_clock_victim();
 
 struct list frame_table;
 
 struct lock frame_table_access_lock;
 struct lock swap_space_lock;
-
-struct list_elem* clock_victim;
 
 struct bitmap* swap_space;
 
@@ -431,12 +428,20 @@ swap_clear (size_t swap_index)
 void 
 evict_victim(void)
 {
+  struct list_elem* victim_page_list_elem;
   struct page* victim_page;
   bool dirty_bit;
   uint8_t victim_file_type;
 
-  //page = evict_clock_victim();
-  victim_page = list_entry(list_pop_front(&frame_table), struct page, lru);
+  victim_page_list_elem = list_front(&frame_table);
+  victim_page = list_entry(victim_page_list_elem, struct page, lru);
+  while (victim_page->vme->is_pinned == true) {
+    victim_page_list_elem = list_next(victim_page_list_elem);
+    victim_page = list_entry(victim_page_list_elem, struct page, lru);
+  } 
+  list_remove(victim_page_list_elem);  
+  //victim_page = list_entry(list_pop_front(&frame_table), struct page, lru);
+
   dirty_bit = pagedir_is_dirty(victim_page->page_thread->pagedir,
                                victim_page->vme->va);
   victim_file_type = victim_page->vme->file_type;
@@ -464,57 +469,4 @@ evict_victim(void)
   palloc_free_page (victim_page->physical_addr);
   free (victim_page);
 
-}
-
-/**
- * @return evicted victim by the clock algorithm 
- * 
- * Evict a victim from the LRU list per the clock algorithm.
- */ 
-void* 
-evict_clock_victim(void) 
-{
-  struct list_elem* clock_victim;
-  struct page* page;
-  bool access_status;
-
-  while (true) {
-    clock_victim = find_clock_victim();
-    page = list_entry(clock_victim, struct page, lru);
-    if (page->vme != NULL) {
-      access_status = pagedir_is_accessed(thread_current()->pagedir, 
-                                          page->vme->va);
-      if (access_status) {
-        pagedir_set_accessed(thread_current()->pagedir, 
-                             page->vme->va, false);
-      } else {
-        break;
-      }
-    }
-  }
-  list_remove(clock_victim);
-  return page;  
-}
-
-/** 
- * @returns list_elem* of the next victim to evict 
- * 
- * Returns the next victim based on the clock algorithm. If victim is NULL, 
- * get the first elem of the frame_table list 
- */ 
-static struct list_elem* 
-find_clock_victim(void) 
-{
-  if (clock_victim == NULL) { 
-    if(list_empty(&frame_table)) {
-      clock_victim = NULL;
-    } else {
-      clock_victim = list_begin(&frame_table);
-    } // end of clock_victim == NULL
-  } else {
-    clock_victim = list_next(clock_victim);
-    if (clock_victim == NULL)
-      clock_victim = list_begin(&frame_table);
-  }
-  return clock_victim;
 }

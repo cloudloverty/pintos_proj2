@@ -26,6 +26,7 @@ struct vm_entry {
   
   bool write_permission;    //whether writing to that address is permitted 
   bool is_loaded_to_memory; //whether vp is loaded to physical memory 
+  bool is_pinned;           //if vme is in file_read, it mustn't be evicted 
 
   struct file* file;        //pointer to file mapped to the virtual address 
 
@@ -73,8 +74,6 @@ void init_swap_space(size_t size_of_swap_space);
 void swap_in(void* addr, size_t index);
 size_t swap_out(void* addr);
 void swap_clear (size_t swap_index);
-void* evict_clock_victim();
-
 void evict_victim(void);
 
 #endif

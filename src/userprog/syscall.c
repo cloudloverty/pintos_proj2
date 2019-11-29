@@ -486,6 +486,21 @@ read(int fd, void* buffer, unsigned size)
 {
   //printf("fd: %d, p: %p,size: %u\n", fd, buffer, size);
   unsigned count;
+  unsigned u_buffer;
+  unsigned i;
+
+  struct vm_entry* vme;
+
+  u_buffer = (unsigned) buffer;
+  i = u_buffer;
+
+  for (; i < u_buffer + size; i = i + PGSIZE) {
+    vme = find_vme((void*) i);
+    vme->is_pinned = true;
+    if (vme->is_loaded_to_memory == false)
+      page_fault_handler(vme);
+  }
+
 	lock_acquire(&filesys_lock);
 
   count = size;
@@ -502,6 +517,12 @@ read(int fd, void* buffer, unsigned size)
 	else if (fd > 2) {
 		struct file* f = get_file(fd);
 		if (f == NULL) { 
+      //unpin 
+      i = u_buffer;
+      for (; i < u_buffer + size; i = i + PGSIZE) {
+        vme = find_vme((void*) i);
+        vme->is_pinned = false;
+      }
 			lock_release(&filesys_lock);
 			return -1; 
 		}
@@ -510,6 +531,12 @@ read(int fd, void* buffer, unsigned size)
 
 		return ans;
 	}
+  //unpin string 
+  i = u_buffer;
+  for (; i < u_buffer + size; i = i + PGSIZE) {
+    vme = find_vme((void*) i);
+    vme->is_pinned = false;
+  }
 	lock_release(&filesys_lock);
 
 	return -1;

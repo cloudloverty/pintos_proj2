@@ -686,6 +686,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       vme->is_loaded_to_memory = false;
       vme->va = upage; 
       vme->swap_slot = 0;
+      vme->is_pinned = false;
 
       //Add vm_entry to hash table
       insert_vme(&thread_current()->vm, vme);
@@ -740,6 +741,7 @@ setup_stack (void **esp)
 		  kpage->vme->write_permission = true;    
 		  kpage->vme->is_loaded_to_memory = true;
       kpage->vme->swap_slot = 0;
+      kpage->vme->is_pinned = false;
 
 		  //insert created vm_entry into vm hash table of thread 
 		  insert_vme(&thread_current()->vm, kpage->vme);
@@ -899,6 +901,7 @@ grow_stack(void* addr)
 	kpage->vme->is_loaded_to_memory = true;
 	kpage->vme->va = page_addr;
   kpage->vme->swap_slot = 0;
+  kpage->vme->is_pinned = false;
 
 	insert_vme(&thread_current()->vm, kpage->vme);
 

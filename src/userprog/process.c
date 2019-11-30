@@ -837,6 +837,8 @@ page_fault_handler (struct vm_entry* vme)
   struct page* kaddr; //address of physical page 
   bool res;  
   //printf("page_fault_handler!!\n");
+  vme->is_pinned = true;
+
   kaddr = allocate_page (PAL_USER);
   if (kaddr == NULL) {
     return false;
@@ -871,6 +873,8 @@ page_fault_handler (struct vm_entry* vme)
       ASSERT(false); // should never reach 
       break;
   }
+  vme->is_pinned = false;
+
   return res;
 }
 
@@ -885,7 +889,8 @@ grow_stack(void* addr)
   void* page_addr;
   struct page* kpage;
 
-	/* No heuristic check here, check heuristic validity before using this function */
+	/* No heuristic check here, check heuristic validity before using 
+  this function */
   page_addr = pg_round_down(addr);
 
 	/* stack should be smaller than 8MB */

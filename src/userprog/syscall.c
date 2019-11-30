@@ -504,9 +504,9 @@ read(int fd, void* buffer, unsigned size)
 
   for (; i < u_buffer + size; i = i + PGSIZE) {
     vme = find_vme((void*) i);
-    vme->is_pinned = true;
     if (vme->is_loaded_to_memory == false)
       page_fault_handler(vme);
+    vme->is_pinned = true;
   }
 
 	lock_acquire(&filesys_lock);
@@ -579,9 +579,10 @@ write(int fd, const void* buffer, unsigned size)
   i = u_buffer;
   for (; i < u_buffer + size; i = i + PGSIZE) {
     vme = find_vme((void*) i);
-    vme->is_pinned = true;
     if (vme->is_loaded_to_memory == false)
       page_fault_handler(vme);
+    vme->is_pinned = true;
+
   }
 
 	lock_acquire(&filesys_lock);

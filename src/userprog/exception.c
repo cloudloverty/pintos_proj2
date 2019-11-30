@@ -174,8 +174,10 @@ page_fault (struct intr_frame *f)
 	  if (vme == NULL)
 	  {
 		  //printf("page fault 2\n");
-		  if (USER_STACK_GROW_LIMIT >= f->esp - fault_addr) {
-			  if (grow_stack(fault_addr)) {
+		  if (USER_STACK_GROW_LIMIT >= f->esp - fault_addr && 
+          is_user_vaddr (fault_addr) && f->esp - fault_addr <= 32) {
+			  //printf("growing stack on %x\n", fault_addr);
+        if (grow_stack(fault_addr)) {
 				  goto done;
 			  }
 		  }

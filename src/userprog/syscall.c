@@ -408,9 +408,17 @@ bool		//4
 create(const char* file, unsigned initial_size)
 {
 	//check_add_valid(file);
+  bool res;
 
 	if (*file == NULL) exit(-1);
-	return filesys_create(file, initial_size);
+  lock_acquire (&filesys_lock);
+	res = filesys_create(file, initial_size);
+  /*   struct file* c_file = filesys_open(file);
+  printf("allocated file to %p with %d status\n",  c_file, res);
+  filesys_close(c_file); */
+  lock_release (&filesys_lock);
+  return res;
+  
 }
 
 
@@ -562,11 +570,30 @@ write(int fd, const void* buffer, unsigned size)
 	//check_add_valid(buffer);
   //printf("fd: %d, buffer: %p, size: %d", fd, buffer, size);
 
+  unsigned u_buffer;
+  unsigned i;
+
+  struct vm_entry* vme;
+
+  u_buffer = (unsigned) buffer;
+  i = u_buffer;
+  for (; i < u_buffer + size; i = i + PGSIZE) {
+    vme = find_vme((void*) i);
+    vme->is_pinned = true;
+    if (vme->is_loaded_to_memory == false)
+      page_fault_handler(vme);
+  }
+
 	lock_acquire(&filesys_lock);
 
 	if (fd == 1)
 	{
 		putbuf(buffer, size);
+  	i = u_buffer;
+    for (; i < u_buffer + size; i = i + PGSIZE) {
+      vme = find_vme((void*) i);
+      vme->is_pinned = false;
+    }
 		lock_release(&filesys_lock);
 		return size;
 	}
@@ -577,7 +604,11 @@ write(int fd, const void* buffer, unsigned size)
 			return -1; 
 		}
 		int ans = file_write(f, buffer, size);
-		
+		i = u_buffer;
+    for (; i < u_buffer + size; i = i + PGSIZE) {
+      vme = find_vme((void*) i);
+      vme->is_pinned = false;
+    }
 		lock_release(&filesys_lock);
 		return ans;
 	}
@@ -700,6 +731,7 @@ mmap(int fd, void* addr)
     vm_entry->zero_bytes = PGSIZE - vm_entry->read_bytes;
     vm_entry->is_loaded_to_memory = false;
     vm_entry->va = addr;  
+    vm_entry->is_pinned = true;
 
     list_push_back (&mmap_file->vme_list, &vm_entry->mmap_elem);
     insert_vme (&thread_current ()->vm, vm_entry);
@@ -744,6 +776,7 @@ munmap(mapid_t mapid)
       }
             
       vme->is_loaded_to_memory = false;
+      vme->is_pinned = false;
       e = list_remove(e);
       delete_vme(&thread_current()->vm, vme);
     }

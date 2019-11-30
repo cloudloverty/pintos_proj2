@@ -337,6 +337,7 @@ process_exit (void)
               free_physical_page_frame(vme->va);
             }
             vme->is_loaded_to_memory = false;
+            vme->is_pinned = false;
             vme = list_entry(e, struct vm_entry, mmap_elem);
             list_remove(e);
             delete_vme(&thread_current()->vm, vme);
@@ -718,12 +719,16 @@ setup_stack (void **esp)
   }
 
   kpage = allocate_page (PAL_USER | PAL_ZERO);
+  push_page_to_table(kpage);
   if (kpage != NULL) 
     {
 	  //printf("phys base: %x\n", PHYS_BASE);
 	  //printf("pgsize: %u\n", PGSIZE);
-      //push_page_to_table(kpage);
       upage = ((uint8_t *) PHYS_BASE) - PGSIZE;
+/*       while (find_vme(upage) != NULL) {
+        upage -= PGSIZE;
+      } */
+
       success = install_page (upage, kpage->physical_addr, true);
       if (success) 
 	  {
@@ -741,9 +746,11 @@ setup_stack (void **esp)
 		  kpage->vme->write_permission = true;    
 		  kpage->vme->is_loaded_to_memory = true;
       kpage->vme->swap_slot = 0;
-      kpage->vme->is_pinned = false;
+      kpage->vme->is_pinned = true;
 
 		  //insert created vm_entry into vm hash table of thread 
+      /* printf("setup_stack address: %x, %x\n", kpage->physical_addr, 
+             kpage->vme->va); */
 		  insert_vme(&thread_current()->vm, kpage->vme);
 		  //printf("setup_stack vme insterted: %x\n", upage);
 		  ////////// Added in P3 end /////////
@@ -843,8 +850,8 @@ page_fault_handler (struct vm_entry* vme)
         free_physical_page_frame(kaddr->physical_addr);
         return false;
       }
-      /* printf("installing up 0x%x to vp 0x%x\n", 
-              vme->va, kaddr->physical_addr); */
+       /* printf("installing up 0x%x to vp 0x%x\n", 
+              vme->va, kaddr->physical_addr);  */
       res = install_page(vme->va, kaddr->physical_addr, vme->write_permission);
       if (!res) {
 		    return false;
@@ -886,9 +893,11 @@ grow_stack(void* addr)
 		return false;
 	}
 
-	//kpage = alloc page()
-	 kpage = allocate_page (PAL_USER);
+	kpage = allocate_page (PAL_USER | PAL_ZERO);
+  if (kpage == NULL) 
+    return false;
 
+  push_page_to_table(kpage);
 
 	/* creat and init vm_entry of page */
 	kpage->vme = (struct vm_entry*) malloc(sizeof(struct vm_entry));
@@ -901,12 +910,15 @@ grow_stack(void* addr)
 	kpage->vme->is_loaded_to_memory = true;
 	kpage->vme->va = page_addr;
   kpage->vme->swap_slot = 0;
-  kpage->vme->is_pinned = false;
+  kpage->vme->is_pinned = true;
+    /* printf("grow_stack PA: %x, VA: %x\n", kpage->physical_addr,
+            kpage->vme->va);  */
+
 
 	insert_vme(&thread_current()->vm, kpage->vme);
 
 	if (!install_page(page_addr, kpage->physical_addr, true)) {
 		return false;
 	}
-
+  return true;
 }

@@ -2,6 +2,7 @@
 
 #include "vm/page.h"
 #include "userprog/process.h"
+#include "threads/thread.h"
 #include "devices/block.h"
 
 static unsigned vm_hash_func(const struct hash_elem* e, void* aux);
@@ -178,7 +179,7 @@ hash_destroy_action_func (struct hash_elem* e, void* aux UNUSED)
   //printf("in hash_destroy_action_func\n");
 
   struct vm_entry* vme; //struct that hash_elem e is in 
-  void* start_of_page; 
+  //void* start_of_page; 
   
   vme = (struct vm_entry*) hash_entry(e, struct vm_entry, elem);
   
@@ -208,8 +209,10 @@ bool
 load_file(void* kaddr, struct vm_entry* vme) 
 {
   off_t actual_read; 
-
+  
+  //lock_acquire(&filesys_lock);
   actual_read = file_read_at(vme->file, kaddr, vme->read_bytes, vme->offset);
+  //lock_acquire(&filesys_lock);
   memset (kaddr + vme->read_bytes, 0, vme->zero_bytes);
 
   if (actual_read != vme->read_bytes) {
@@ -358,7 +361,7 @@ init_swap_space(size_t size_of_swap_space)
   swap_space = bitmap_create(size_of_swap_space);
   bitmap_set_all(swap_space, true);
   lock_init(&swap_space_lock); 
-  printf("swap init complete\n");
+  //printf("swap init complete\n");
 }
 
 
@@ -374,6 +377,9 @@ swap_in (void* addr, size_t index)
   //printf("swapping in %p from %d:\n", addr, index);
   size_t i;  
   struct block* block;
+
+  lock_acquire(&swap_space_lock);
+
   
   block = block_get_role(BLOCK_SWAP);
   i = 0;
@@ -382,6 +388,9 @@ swap_in (void* addr, size_t index)
     block_read (block, index * 8 + i, addr + 512 * i);
 
   bitmap_set (swap_space, index, true);
+
+  lock_release(&swap_space_lock);
+
 }
 
 /**
@@ -396,6 +405,8 @@ swap_out(void* addr)
   size_t swap_index;
   struct block* block;
 
+  lock_acquire(&swap_space_lock);
+
   block = block_get_role(BLOCK_SWAP);
   i = 0;
   swap_index = bitmap_scan_and_flip (swap_space, 0, 1, true);
@@ -405,8 +416,8 @@ swap_out(void* addr)
     //swap_index * 8 is done as that is one page. 
     block_write(block, swap_index * 8 + i, addr + 512 * i);
   }
-    //printf("swapping out %p to %d: \n", addr, swap_index);
-
+  //printf("swapping out %p to %d: \n", addr, swap_index);
+  lock_release(&swap_space_lock);
   return swap_index;
 
 }
@@ -417,8 +428,11 @@ swap_out(void* addr)
 void
 swap_clear (size_t swap_index)
 {
+  lock_acquire(&swap_space_lock);
   //printf("swap index: 0x%x\n", swap_index);
   bitmap_set(swap_space, swap_index, true);
+  lock_release(&swap_space_lock);
+
 }
 
 
